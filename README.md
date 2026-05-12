@@ -46,8 +46,11 @@ Download `MySQL-Backup-Scheduler.exe` from the `dist/` folder (or the Releases p
 # 2. Open a terminal in the project folder
 
 setup.bat        # installs Python dependencies
-run.bat          # starts the application
 ```
+
+Then launch with **`run.vbs`** (double-click) — starts the app with no CMD window.
+
+`run.bat` is kept for debugging only; it shows a console so startup errors (e.g. missing imports) are visible.
 
 ---
 
