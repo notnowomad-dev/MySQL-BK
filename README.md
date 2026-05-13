@@ -13,11 +13,14 @@ A Windows desktop application for scheduling automated MySQL database backups wi
   - Single `.sql` file (all selected DBs merged)
   - Multiple `.sql` files (one per database or table)
   - Daily overwrite — 7 rotating files (`mon.sql` … `sun.sql`) that overwrite each week
-- **7-Zip compression** — optional `.7z` archive with optional password per job
+- **ZIP compression** — optional `.zip` archive with optional AES-256 password; opens with Windows Explorer — no extra software needed
+- **BLOB/BINARY export** — optional `--hex-blob` flag exports binary columns as safe hex strings
+- **Start with Windows** — one-click autostart toggle in the system tray menu
 - **System tray** — minimizes to tray; backups keep running while the window is hidden
 - **Run Now** — trigger any job immediately from the UI
 - **Log viewer** — per-job history of every run (timestamp, status, message)
 - **Single-instance** — launching a second copy restores the existing window instead
+- **VC++ auto-install** — bundles the Microsoft Visual C++ Redistributable and installs it automatically if missing
 
 ---
 
@@ -25,11 +28,12 @@ A Windows desktop application for scheduling automated MySQL database backups wi
 
 | Requirement | Notes |
 |---|---|
-| Windows 10 / 11 | 64-bit |
+| Windows 10 / 11 or Server 2019+ | 64-bit |
 | MySQL server | Local or remote |
 | `mysqldump.exe` | Comes with MySQL Server or MySQL Shell |
 | Python 3.10+ | Only needed when running from source |
-| 7-Zip (optional) | Required only if compression is enabled; default path `C:\Program Files\7-Zip\7z.exe` |
+
+No third-party compression software required — ZIP is handled by Python's built-in `zipfile` module (and `pyzipper` for password-protected archives).
 
 ---
 
@@ -37,7 +41,7 @@ A Windows desktop application for scheduling automated MySQL database backups wi
 
 ### Option A — Pre-built executable (recommended)
 
-Download `MySQL-Backup-Scheduler.exe` from the `dist/` folder (or the Releases page) and run it directly. No Python installation required.
+Download `MySQL-Backup-Scheduler.exe` from the `dist/` folder (or the Releases page) and run it directly. No Python installation required. The Microsoft Visual C++ Redistributable is bundled and installed automatically if missing.
 
 ### Option B — Run from source
 
@@ -45,14 +49,14 @@ Download `MySQL-Backup-Scheduler.exe` from the `dist/` folder (or the Releases p
 # 1. Clone or download the project
 # 2. Open a terminal in the project folder
 
-setup.bat        # installs Python dependencies
+setup.bat        # installs Python dependencies (including pyzipper for encrypted zips)
 ```
 
 Then launch with **`run.vbs`** (double-click) — starts the app with no CMD window.
 
 `run.bat` is kept for debugging only; it shows a console so startup errors (e.g. missing imports) are visible.
 
-> **Python auto-detection** — `setup.bat` and `run.bat` find Python automatically without requiring it to be on `PATH`. They first check the system `python` command but only accept it if `pip` is functional (this filters out embedded Pythons such as the one bundled with Inkscape). If that check fails, they scan the following locations in order, newest version first:
+> **Python auto-detection** — `setup.bat`, `run.bat`, and `build.bat` find Python automatically without requiring it to be on `PATH`. They first check the system `python` command but only accept it if `pip` is functional (this filters out embedded Pythons such as the one bundled with Inkscape). If that check fails, they scan the following locations in order, newest version first:
 >
 > | Location pattern | Example |
 > |---|---|
@@ -70,7 +74,7 @@ Then launch with **`run.vbs`** (double-click) — starts the app with no CMD win
 build.bat
 ```
 
-This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained and can be copied anywhere. `build.bat` uses the same Python auto-detection logic as `setup.bat` (see above).
+This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained — no Python, VC++ runtime, or compression software needed on the target machine. `build.bat` also downloads `vc_redist.x64.exe` automatically (if not already present) so it can be bundled into the exe.
 
 ---
 
@@ -85,7 +89,7 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 | **Connection** | MySQL host, port, username, password, and path to `mysqldump.exe` |
 | **Databases** | Click **Reload Databases**, then check the databases (and optionally specific tables) to include |
 | **Schedule** | Choose frequency (Hourly / Daily / Weekly / Monthly / Cron) and the time |
-| **Output** | Destination folder, SQL format, and optional 7-Zip compression |
+| **Output** | Destination folder, SQL format, optional ZIP compression, and mysqldump options |
 
 4. Click **OK** to save. The job appears in the main list and starts running on schedule automatically.
 
@@ -133,9 +137,9 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 
 **Compression**
 
-- Enable **Compress with 7-Zip** to produce `.7z` archives instead of plain `.sql` files.
-- Optionally set a **password**; the archive will use AES-256 encryption with header encryption (`-mhe=on`).
-- The path to `7z.exe` can be changed if 7-Zip is installed in a non-default location.
+- Enable **Compress output as .zip** to produce a `.zip` archive instead of plain `.sql` files.
+- The archive opens directly in Windows Explorer — no extra software needed.
+- Optionally set a **password**; the archive will use AES-256 encryption via `pyzipper` (installed by `setup.bat`).
 
 **Use --hex-blob** — when checked, BLOB and BINARY columns are exported as hexadecimal strings (e.g. `0x89504e47…`) instead of raw binary. This prevents encoding issues when the dump file is opened as UTF-8 text and is recommended whenever your schema contains image, file, or binary data. Enabled by default.
 
@@ -152,6 +156,7 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 | **Delete** | Permanently delete the selected job |
 | **Run Now** | Execute the selected job immediately in the background |
 | **Logs** | Open the log viewer for the selected job (or all jobs if none selected) |
+| **Exit** | Quit the application |
 
 Right-clicking a row shows the same actions plus **Open Destination Folder**.
 
@@ -161,7 +166,10 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 
 - Closing or minimizing the window hides it to the tray — backups keep running.
 - **Single-click** or **double-click** the tray icon to restore the window.
-- Right-click the tray icon for **Restore GUI** or **Exit**.
+- Right-click the tray icon for:
+  - **Restore GUI** — bring the window back
+  - **Start with Windows** — toggle autostart on login (writes to `HKCU\...\Run` registry key)
+  - **Exit** — quit the application
 
 ---
 
@@ -169,8 +177,9 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 
 | Path | Contents |
 |---|---|
-| `%APPDATA%\MySQLBackup\` | SQLite database (`jobs.db`) storing all jobs and logs |
-| Output directory (per job) | Generated `.sql` or `.7z` backup files |
+| `%USERPROFILE%\.mysql_backup_scheduler\jobs.db` | SQLite database storing all jobs and logs |
+| Output directory (per job) | Generated `.sql` or `.zip` backup files |
+| Next to the `.exe` | `startup_error.log` — written automatically if the app fails to start |
 
 ---
 
@@ -179,14 +188,22 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 **`mysqldump not found`**
 Set the full path to `mysqldump.exe` in the Connection tab (e.g. `C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe`), or add the MySQL `bin` folder to your system `PATH`.
 
-**`7-Zip not found`**
-Install 7-Zip from [7-zip.org](https://www.7-zip.org/) or set the correct path to `7z.exe` in the Output tab.
+**Application fails to start with a DLL error**
+The pre-built `.exe` bundles `vc_redist.x64.exe` and installs it automatically. If the error persists:
+1. Check `startup_error.log` next to the `.exe` — it lists which specific DLLs are missing.
+2. Install the Microsoft Visual C++ 2015–2022 Redistributable (x64) manually: `https://aka.ms/vs/17/release/vc_redist.x64.exe`
+3. Reboot and try again.
+
+> **Windows Server 2016 is not supported.** Qt 5 (PyQt5) requires Windows 10 build 1607 or later / Server 2019+. Server 2016 (build 14393 = Windows 10 1607) may work but is not officially supported.
 
 **Job shows "Failed" in status**
 Open the Logs viewer (toolbar or right-click menu) to read the full error message from the last run.
 
+**Password-protected zip not working**
+Ensure `pyzipper` is installed by running `setup.bat`. For the pre-built exe it is bundled automatically. Without `pyzipper`, zips are created without a password.
+
 **Application won't start / database error**
-Delete `%APPDATA%\MySQLBackup\jobs.db` to reset all job data and start fresh.
+Delete `%USERPROFILE%\.mysql_backup_scheduler\jobs.db` to reset all job data and start fresh.
 
 **`setup.bat` / `build.bat` picks the wrong Python**
 The scripts skip any Python that does not have `pip` available and scan a fixed list of common install paths. If your Python is in a non-standard location, either add it to your system `PATH` (and ensure `pip` is installed) or run the install command manually:
@@ -200,11 +217,11 @@ C:\your\python\path\python.exe -m pip install -r requirements.txt
 
 | Component | Library |
 |---|---|
-| GUI | [PyQt6](https://pypi.org/project/PyQt6/) |
+| GUI | [PyQt5](https://pypi.org/project/PyQt5/) |
 | Scheduler | [APScheduler](https://apscheduler.readthedocs.io/) 3.x |
 | MySQL connectivity | [mysql-connector-python](https://pypi.org/project/mysql-connector-python/) |
 | Backup engine | `mysqldump` (system binary) |
-| Compression | 7-Zip (system binary) |
+| Compression | Python `zipfile` (built-in) + [pyzipper](https://pypi.org/project/pyzipper/) for AES-256 passwords |
 | Job storage | SQLite via Python `sqlite3` |
 | Packaging | [PyInstaller](https://pyinstaller.org/) |
 
@@ -214,14 +231,16 @@ C:\your\python\path\python.exe -m pip install -r requirements.txt
 
 ```
 MySQL-BK/
-├── main.py                 # Entry point, single-instance guard
+├── main.py                 # Entry point, single-instance guard, VC++ auto-install
 ├── requirements.txt
 ├── mysql_backup.spec       # PyInstaller spec
 ├── setup.bat               # Install dependencies
-├── run.bat                 # Run from source
+├── run.bat                 # Run from source (with console)
+├── run.vbs                 # Run from source (no console)
 ├── build.bat               # Build standalone .exe
 ├── core/
-│   ├── backup.py           # BackupRunner — calls mysqldump and 7-Zip
+│   ├── autostart.py        # Windows registry autostart helper
+│   ├── backup.py           # BackupRunner — mysqldump + ZIP compression
 │   ├── db_connector.py     # MySQLConnector — lists databases/tables
 │   └── scheduler.py        # BackupScheduler — APScheduler wrapper
 ├── models/

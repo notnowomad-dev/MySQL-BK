@@ -1,16 +1,17 @@
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QSystemTrayIcon, QMenu, QMessageBox, QToolBar, QLabel,
-    QAbstractItemView, QProgressBar,
+    QAbstractItemView, QProgressBar, QAction,
 )
 import os
 import subprocess
-from PyQt6.QtCore import Qt, QTimer, QEvent, pyqtSignal
-from PyQt6.QtGui import QIcon, QPixmap, QColor, QPainter, QFont, QAction
+from PyQt5.QtCore import Qt, QTimer, QEvent, pyqtSignal
+from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter, QFont
 
 from models.job import BackupJob
 from ui.job_dialog import JobDialog
 from ui.log_viewer import LogViewer
+from core.autostart import get_autostart, set_autostart
 
 
 class MainWindow(QMainWindow):
@@ -50,6 +51,12 @@ class MainWindow(QMainWindow):
         restore_action = menu.addAction("Restore GUI")
         restore_action.triggered.connect(self._restore_window)
         menu.addSeparator()
+        self._autostart_action = QAction("Start with Windows", self)
+        self._autostart_action.setCheckable(True)
+        self._autostart_action.setChecked(get_autostart())
+        self._autostart_action.triggered.connect(self._toggle_autostart)
+        menu.addAction(self._autostart_action)
+        menu.addSeparator()
         exit_action = menu.addAction("Exit")
         exit_action.triggered.connect(self._quit)
 
@@ -60,16 +67,16 @@ class MainWindow(QMainWindow):
 
     def _make_icon(self) -> QIcon:
         px = QPixmap(32, 32)
-        px.fill(Qt.GlobalColor.transparent)
+        px.fill(Qt.transparent)
         p = QPainter(px)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.Antialiasing)
         p.setBrush(QColor("#1565C0"))
-        p.setPen(Qt.PenStyle.NoPen)
+        p.setPen(Qt.NoPen)
         p.drawRoundedRect(0, 0, 32, 32, 6, 6)
         p.setPen(QColor("white"))
-        f = QFont("Arial", 10, QFont.Weight.Bold)
+        f = QFont("Arial", 10, QFont.Bold)
         p.setFont(f)
-        p.drawText(px.rect(), Qt.AlignmentFlag.AlignCenter, "DB")
+        p.drawText(px.rect(), Qt.AlignCenter, "DB")
         p.end()
         return QIcon(px)
 
@@ -95,25 +102,26 @@ class MainWindow(QMainWindow):
         act("▶  Run Now", self._run_now)
         bar.addSeparator()
         act("📋  Logs", self._view_logs)
-
+        bar.addSeparator()
+        act("🗙 Exit program", self._quit)
         self._table = QTableWidget()
         self._table.setColumnCount(7)
         self._table.setHorizontalHeaderLabels(
             ["Name", "Host", "Schedule", "Output Dir", "Enabled", "Last Run", "Status"]
         )
         hdr = self._table.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        hdr.setSectionResizeMode(0, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
         self._table.doubleClicked.connect(self._edit_job)
-        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._show_context_menu)
 
         central = QWidget()
@@ -144,7 +152,7 @@ class MainWindow(QMainWindow):
                 item = QTableWidgetItem(str(text) if text is not None else "")
                 if color:
                     item.setForeground(color)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 return item
 
             self._table.setItem(row, 0, cell(job.name))
@@ -163,7 +171,7 @@ class MainWindow(QMainWindow):
             self._table.setItem(row, 6, cell(st, sc))
 
             # Store job id for lookup
-            self._table.item(row, 0).setData(Qt.ItemDataRole.UserRole, job.id)
+            self._table.item(row, 0).setData(Qt.UserRole, job.id)
 
     @staticmethod
     def _fmt_schedule(job: BackupJob) -> str:
@@ -191,7 +199,7 @@ class MainWindow(QMainWindow):
         if row < 0:
             return None
         item = self._table.item(row, 0)
-        return item.data(Qt.ItemDataRole.UserRole) if item else None
+        return item.data(Qt.UserRole) if item else None
 
     # ------------------------------------------------------------ actions --
 
@@ -231,8 +239,8 @@ class MainWindow(QMainWindow):
         if QMessageBox.question(
             self, "Delete job",
             f"Delete job '{job.name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        ) == QMessageBox.StandardButton.Yes:
+            QMessageBox.Yes | QMessageBox.No,
+        ) == QMessageBox.Yes:
             self.scheduler.unschedule_job(job_id)
             self.db.delete_job(job_id)
             self._refresh_jobs()
@@ -277,7 +285,7 @@ class MainWindow(QMainWindow):
         self._tray.showMessage(
             "MySQL Backup",
             f"{'✓' if success else '✗'} {job_name}: {msg}",
-            QSystemTrayIcon.MessageIcon.Information if success else QSystemTrayIcon.MessageIcon.Critical,
+            QSystemTrayIcon.Information if success else QSystemTrayIcon.Critical,
             4000,
         )
         QTimer.singleShot(2000, self._reset_progress)
@@ -307,6 +315,8 @@ class MainWindow(QMainWindow):
             menu.addAction("📋  View Logs",       self._view_logs)
             menu.addSeparator()
             menu.addAction("✕  Delete Job",       self._delete_job)
+            menu.addSeparator()
+            menu.addAction("🗙 Exit program",       self._quit)
         else:
             menu.addAction("＋  Add Job",         self._add_job)
 
@@ -326,6 +336,12 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------ tray/close --
 
+    def _toggle_autostart(self, checked: bool):
+        ok, err = set_autostart(checked)
+        if not ok:
+            QMessageBox.warning(self, "Autostart", f"Could not update registry:\n{err}")
+            self._autostart_action.setChecked(not checked)
+
     def _restore_window(self):
         self.showNormal()
         self.activateWindow()
@@ -333,20 +349,20 @@ class MainWindow(QMainWindow):
 
     def _tray_activated(self, reason):
         if reason in (
-            QSystemTrayIcon.ActivationReason.Trigger,       # single-click
-            QSystemTrayIcon.ActivationReason.DoubleClick,
+            QSystemTrayIcon.Trigger,       # single-click
+            QSystemTrayIcon.DoubleClick,
         ):
             self._restore_window()
 
     def changeEvent(self, event):
-        if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
+        if event.type() == QEvent.WindowStateChange and self.isMinimized():
             event.ignore()
             self.hide()
             self._tray.showMessage(
                 "MySQL Backup Scheduler",
                 "Minimized to tray — backups continue running.\n"
                 "Right-click the tray icon to restore or exit.",
-                QSystemTrayIcon.MessageIcon.Information,
+                QSystemTrayIcon.Information,
                 3000,
             )
             return
@@ -359,12 +375,12 @@ class MainWindow(QMainWindow):
             "MySQL Backup Scheduler",
             "Running in background — backups continue.\n"
             "Right-click the tray icon to restore or exit.",
-            QSystemTrayIcon.MessageIcon.Information,
+            QSystemTrayIcon.Information,
             3000,
         )
 
     def _quit(self):
         self._timer.stop()
         self.scheduler.stop()
-        from PyQt6.QtWidgets import QApplication
+        from PyQt5.QtWidgets import QApplication
         QApplication.quit()

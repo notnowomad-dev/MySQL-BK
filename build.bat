@@ -46,9 +46,27 @@ if not defined PYTHON (
 echo Found: "!PYTHON!"
 "!PYTHON!" --version
 
+:: Bundle vc_redist.x64.exe — skip download if already installed or file exists
+echo.
+echo [1/5] Checking vc_redist.x64.exe...
+if exist vc_redist.x64.exe (
+    echo Found ^(file already present^).
+) else if exist "%SystemRoot%\System32\MSVCP140_1.dll" (
+    echo VC++ 2022 already installed on this machine — skipping download.
+) else (
+    echo Downloading vc_redist.x64.exe ^(~25 MB^)...
+    powershell -Command "Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile 'vc_redist.x64.exe' -UseBasicParsing"
+    if !errorlevel! neq 0 (
+        echo WARNING: Download failed — vc_redist.x64.exe will not be bundled.
+        echo          Target machines may need to install VC++ Redistributable manually.
+    ) else (
+        echo Downloaded.
+    )
+)
+
 :: Upgrade PyInstaller
 echo.
-echo [1/4] Upgrading PyInstaller...
+echo [2/5] Upgrading PyInstaller...
 "!PYTHON!" -m pip install --upgrade "pyinstaller>=6.0" --quiet
 if !errorlevel! neq 0 (
     echo ERROR: Failed to upgrade PyInstaller.
@@ -57,7 +75,7 @@ if !errorlevel! neq 0 (
 
 :: Ensure runtime deps are present
 echo.
-echo [2/4] Verifying dependencies...
+echo [3/5] Verifying dependencies...
 "!PYTHON!" -m pip install -r requirements.txt --quiet
 if !errorlevel! neq 0 (
     echo ERROR: Failed to install dependencies.
@@ -66,13 +84,13 @@ if !errorlevel! neq 0 (
 
 :: Clean previous build artefacts
 echo.
-echo [3/4] Cleaning previous build...
+echo [4/5] Cleaning previous build...
 if exist build  rmdir /s /q build
 if exist dist   rmdir /s /q dist
 
 :: Build
 echo.
-echo [4/4] Building executable (this may take a minute)...
+echo [5/5] Building executable (this may take a minute)...
 "!PYTHON!" -m PyInstaller mysql_backup.spec
 if !errorlevel! neq 0 (
     echo.

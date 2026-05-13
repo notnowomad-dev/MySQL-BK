@@ -1,10 +1,10 @@
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QLabel, QComboBox, QMessageBox,
     QAbstractItemView,
 )
-from PyQt6.QtGui import QColor
-from PyQt6.QtCore import Qt
+from PyQt5.QtGui import QColor
+from PyQt5.QtCore import Qt
 
 
 class LogViewer(QDialog):
@@ -42,13 +42,13 @@ class LogViewer(QDialog):
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(["Timestamp", "Job", "Status", "Message"])
         hdr = self._table.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.Stretch)
+        self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         vl.addWidget(self._table)
 
         close = QPushButton("Close")
@@ -64,7 +64,7 @@ class LogViewer(QDialog):
                 item = QTableWidgetItem(str(text) if text is not None else "")
                 if color:
                     item.setForeground(color)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 return item
 
             self._table.setItem(row, 0, cell(log["timestamp"]))
@@ -78,7 +78,7 @@ class LogViewer(QDialog):
         if QMessageBox.question(
             self, "Clear logs",
             f"Delete all log entries for {who}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        ) == QMessageBox.StandardButton.Yes:
+            QMessageBox.Yes | QMessageBox.No,
+        ) == QMessageBox.Yes:
             self.db.clear_logs(self.job_id)
             self._load()

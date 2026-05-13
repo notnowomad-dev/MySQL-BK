@@ -1,12 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
+
+_vcredist = 'vc_redist.x64.exe'
+_datas = [(_vcredist, '.')] if os.path.exists(_vcredist) else []
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[],
+    datas=_datas,
     hiddenimports=[
         # APScheduler
         'apscheduler',
@@ -40,7 +44,10 @@ a = Analysis(
         'mysql.connector.locales',
         'mysql.connector.locales.eng',
         # Single-instance socket
-        'PyQt6.QtNetwork',
+        'PyQt5.QtNetwork',
+        # compression
+        'pyzipper',
+        'zipfile',
         # stdlib used at runtime
         'sqlite3',
         'uuid',
@@ -54,7 +61,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'numpy', 'PIL'],
+    excludes=['tkinter', 'matplotlib', 'numpy', 'PIL', 'PyQt6'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

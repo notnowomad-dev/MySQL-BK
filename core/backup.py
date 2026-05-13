@@ -1,5 +1,6 @@
 import os
 import subprocess
+import zipfile
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple
 
@@ -124,27 +125,17 @@ class BackupRunner:
         self, sql_paths: List[str], day: str, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
         if progress:
-            progress("Compressing with 7-Zip …")
+            progress("Compressing …")
         arc_paths: List[str] = []
         for sql_path in sql_paths:
-            arc_path = sql_path.replace(".sql", ".7z")
-            cmd = [self.job.zip_path, "a"]
-            if self.job.zip_password:
-                cmd += [f"-p{self.job.zip_password}", "-mhe=on"]
-            cmd += [arc_path, sql_path]
+            arc_path = sql_path.replace(".sql", ".zip")
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True,
-                                      creationflags=_NO_WINDOW)
-                if proc.returncode != 0:
-                    return False, f"7-Zip error: {proc.stderr.strip()}"
+                self._compress([sql_path], arc_path)
                 if os.path.exists(sql_path):
                     os.remove(sql_path)
                 arc_paths.append(arc_path)
-            except FileNotFoundError:
-                return True, (
-                    f"7-Zip not found at '{self.job.zip_path}'. "
-                    f"SQL files kept in {self.job.output_dir}"
-                )
+            except Exception as e:
+                return False, f"Compression error: {e}"
         return True, f"Daily overwrite ({day}) compressed — {len(arc_paths)} file(s)"
 
     # --------------------------------------------------------------- helpers --
@@ -198,35 +189,33 @@ class BackupRunner:
         self, sql_paths: List[str], ts: str, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
         if progress:
-            progress("Compressing with 7-Zip …")
-
+            progress("Compressing …")
         name = _safe_name(self.job.name)
-        arc_path = os.path.join(self.job.output_dir, f"{name}_{ts}.7z")
-
-        cmd = [self.job.zip_path, "a"]
-        if self.job.zip_password:
-            cmd += [f"-p{self.job.zip_password}", "-mhe=on"]
-        cmd.append(arc_path)
-        cmd.extend(sql_paths)
-
+        arc_path = os.path.join(self.job.output_dir, f"{name}_{ts}.zip")
         try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                creationflags=_NO_WINDOW,
-            )
-            if proc.returncode != 0:
-                return False, f"7-Zip error: {proc.stderr.strip()}"
+            self._compress(sql_paths, arc_path)
             for p in sql_paths:
                 if os.path.exists(p):
                     os.remove(p)
             return True, f"Compressed: {arc_path}"
-        except FileNotFoundError:
-            # 7-Zip not installed — keep SQL files and warn
-            return True, (
-                f"7-Zip not found at '{self.job.zip_path}'. "
-                f"SQL file(s) kept in {self.job.output_dir}"
-            )
         except Exception as e:
-            return False, str(e)
+            return False, f"Compression error: {e}"
+
+    def _compress(self, sql_paths: List[str], arc_path: str):
+        """Write a .zip archive. Uses pyzipper for AES-256 when a password is set."""
+        password = self.job.zip_password.encode() if self.job.zip_password else None
+        if password:
+            try:
+                import pyzipper
+                with pyzipper.AESZipFile(arc_path, "w",
+                                         compression=pyzipper.ZIP_DEFLATED,
+                                         encryption=pyzipper.WZ_AES) as zf:
+                    zf.setpassword(password)
+                    for p in sql_paths:
+                        zf.write(p, os.path.basename(p))
+                return
+            except ImportError:
+                pass  # fall through to standard zipfile without password
+        with zipfile.ZipFile(arc_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in sql_paths:
+                zf.write(p, os.path.basename(p))

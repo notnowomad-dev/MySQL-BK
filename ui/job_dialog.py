@@ -1,12 +1,12 @@
 from typing import Optional
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QTabWidget, QWidget,
     QPushButton, QLineEdit, QSpinBox, QComboBox, QCheckBox, QTreeWidget,
     QTreeWidgetItem, QFileDialog, QLabel, QMessageBox, QDialogButtonBox,
     QGroupBox, QRadioButton, QButtonGroup, QTimeEdit, QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTime, QTimer
+from PyQt5.QtCore import Qt, QTime, QTimer
 
 from core.db_connector import MySQLConnector
 from models.job import BackupJob
@@ -46,7 +46,7 @@ class JobDialog(QDialog):
         root.addWidget(tabs)
 
         btns = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
         btns.accepted.connect(self._accept)
         btns.rejected.connect(self.reject)
@@ -57,7 +57,7 @@ class JobDialog(QDialog):
     def _tab_connection(self) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)
-        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self._host = QLineEdit("localhost")
         form.addRow("Host:", self._host)
@@ -71,7 +71,7 @@ class JobDialog(QDialog):
         form.addRow("Username:", self._user)
 
         self._password = QLineEdit()
-        self._password.setEchoMode(QLineEdit.EchoMode.Password)
+        self._password.setEchoMode(QLineEdit.Password)
         form.addRow("Password:", self._password)
 
         self._dump_path = QLineEdit("mysqldump")
@@ -197,7 +197,7 @@ class JobDialog(QDialog):
     def _tab_output(self) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)
-        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self._out_dir = QLineEdit()
         self._out_dir.setPlaceholderText("Select output folder…")
@@ -230,23 +230,12 @@ class JobDialog(QDialog):
         zip_box = QGroupBox("Compression")
         zip_form = QFormLayout(zip_box)
 
-        self._use_zip = QCheckBox("Compress output with 7-Zip (.7z)")
+        self._use_zip = QCheckBox("Compress output as .zip  (open with Windows Explorer — no extra software needed)")
         zip_form.addRow(self._use_zip)
 
-        self._zip_path = QLineEdit(r"C:\Program Files\7-Zip\7z.exe")
-        bz = QPushButton("Browse…")
-        bz.setFixedWidth(80)
-        bz.clicked.connect(self._browse_zip)
-        zw = QWidget()
-        zh = QHBoxLayout(zw)
-        zh.setContentsMargins(0, 0, 0, 0)
-        zh.addWidget(self._zip_path)
-        zh.addWidget(bz)
-        zip_form.addRow("7z.exe path:", zw)
-
         self._zip_pass = QLineEdit()
-        self._zip_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        self._zip_pass.setPlaceholderText("Leave empty for no password")
+        self._zip_pass.setEchoMode(QLineEdit.Password)
+        self._zip_pass.setPlaceholderText("Leave empty for no password  (requires pyzipper for encrypted zips)")
         zip_form.addRow("Password:", self._zip_pass)
         form.addRow(zip_box)
 
@@ -270,13 +259,6 @@ class JobDialog(QDialog):
         p = QFileDialog.getExistingDirectory(self, "Select output directory")
         if p:
             self._out_dir.setText(p)
-
-    def _browse_zip(self):
-        p, _ = QFileDialog.getOpenFileName(
-            self, "Select 7z.exe", r"C:\Program Files\7-Zip", "Executables (*.exe)"
-        )
-        if p:
-            self._zip_path.setText(p)
 
     # ------------------------------------------------------- connection test --
 
@@ -311,12 +293,12 @@ class JobDialog(QDialog):
         databases = c.get_databases()
         for db in databases:
             db_item = QTreeWidgetItem([db])
-            db_item.setCheckState(0, Qt.CheckState.Unchecked)
-            db_item.setData(0, Qt.ItemDataRole.UserRole, ("db", db))
+            db_item.setCheckState(0, Qt.Unchecked)
+            db_item.setData(0, Qt.UserRole, ("db", db))
             for table in c.get_tables(db):
                 t_item = QTreeWidgetItem([table])
-                t_item.setCheckState(0, Qt.CheckState.Unchecked)
-                t_item.setData(0, Qt.ItemDataRole.UserRole, ("table", db, table))
+                t_item.setCheckState(0, Qt.Unchecked)
+                t_item.setData(0, Qt.UserRole, ("table", db, table))
                 db_item.addChild(t_item)
             self._tree.addTopLevelItem(db_item)
         self._tree.expandAll()
@@ -341,13 +323,13 @@ class JobDialog(QDialog):
             selected_tables = self._job.tables.get(db_name, [])
             if not selected_tables:
                 # Check all children
-                db_item.setCheckState(0, Qt.CheckState.Checked)
+                db_item.setCheckState(0, Qt.Checked)
                 for j in range(db_item.childCount()):
-                    db_item.child(j).setCheckState(0, Qt.CheckState.Checked)
+                    db_item.child(j).setCheckState(0, Qt.Checked)
             else:
                 for j in range(db_item.childCount()):
                     ch = db_item.child(j)
-                    state = Qt.CheckState.Checked if ch.text(0) in selected_tables else Qt.CheckState.Unchecked
+                    state = Qt.Checked if ch.text(0) in selected_tables else Qt.Unchecked
                     ch.setCheckState(0, state)
                 self._update_parent_state(db_item)
         self._tree.blockSignals(False)
@@ -368,15 +350,15 @@ class JobDialog(QDialog):
     def _update_parent_state(parent: QTreeWidgetItem):
         checked = sum(
             1 for i in range(parent.childCount())
-            if parent.child(i).checkState(0) == Qt.CheckState.Checked
+            if parent.child(i).checkState(0) == Qt.Checked
         )
         total = parent.childCount()
         if checked == 0:
-            parent.setCheckState(0, Qt.CheckState.Unchecked)
+            parent.setCheckState(0, Qt.Unchecked)
         elif checked == total:
-            parent.setCheckState(0, Qt.CheckState.Checked)
+            parent.setCheckState(0, Qt.Checked)
         else:
-            parent.setCheckState(0, Qt.CheckState.PartiallyChecked)
+            parent.setCheckState(0, Qt.PartiallyChecked)
 
     # ----------------------------------------------------------- load/save --
 
@@ -405,7 +387,6 @@ class JobDialog(QDialog):
             self._single_rb.setChecked(True)
 
         self._use_zip.setChecked(job.use_zip)
-        self._zip_path.setText(job.zip_path)
         self._zip_pass.setText(job.zip_password)
         self._hex_blob.setChecked(job.hex_blob)
         self._enabled.setChecked(job.enabled)
@@ -442,7 +423,6 @@ class JobDialog(QDialog):
         else:
             job.output_type = "single"
         job.use_zip = self._use_zip.isChecked()
-        job.zip_path = self._zip_path.text().strip()
         job.zip_password = self._zip_pass.text()
         job.hex_blob = self._hex_blob.isChecked()
         job.enabled = self._enabled.isChecked()
@@ -452,16 +432,16 @@ class JobDialog(QDialog):
         job.tables = {}
         for i in range(self._tree.topLevelItemCount()):
             db_item = self._tree.topLevelItem(i)
-            if db_item.checkState(0) == Qt.CheckState.Unchecked:
+            if db_item.checkState(0) == Qt.Unchecked:
                 continue
             db_name = db_item.text(0)
             job.databases.append(db_name)
             sel_tables = [
                 db_item.child(j).text(0)
                 for j in range(db_item.childCount())
-                if db_item.child(j).checkState(0) == Qt.CheckState.Checked
+                if db_item.child(j).checkState(0) == Qt.Checked
             ]
-            all_checked = (db_item.checkState(0) == Qt.CheckState.Checked
+            all_checked = (db_item.checkState(0) == Qt.Checked
                            and db_item.childCount() > 0
                            and len(sel_tables) == db_item.childCount())
             job.tables[db_name] = [] if all_checked else sel_tables

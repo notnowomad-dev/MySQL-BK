@@ -19,6 +19,7 @@ class MySQLConnector:
             user=self.username,
             password=self.password,
             connection_timeout=5,
+            use_pure=True,  # avoid C-extension crash on Server 2016 / older Windows
         )
         if database:
             kwargs["database"] = database

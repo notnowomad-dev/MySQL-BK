@@ -47,6 +47,21 @@ echo Found: "!PYTHON!"
 "!PYTHON!" --version
 echo.
 
+:: Install VC++ Redistributable if missing
+if not exist "%SystemRoot%\System32\MSVCP140.dll" (
+    echo Visual C++ Redistributable not found.
+    if not exist vc_redist.x64.exe (
+        echo Downloading vc_redist.x64.exe ^(~25 MB^)...
+        powershell -Command "Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile 'vc_redist.x64.exe' -UseBasicParsing"
+    )
+    echo Installing Visual C++ Redistributable...
+    vc_redist.x64.exe /install /quiet /norestart
+    echo Done.
+) else (
+    echo Visual C++ Redistributable already installed.
+)
+echo.
+
 echo Installing dependencies...
 "!PYTHON!" -m pip install --upgrade pip
 "!PYTHON!" -m pip install -r requirements.txt
