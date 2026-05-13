@@ -41,7 +41,8 @@ class Database:
                     enabled           INTEGER NOT NULL,
                     last_run          TEXT,
                     last_status       TEXT NOT NULL DEFAULT '',
-                    mysqldump_path    TEXT NOT NULL DEFAULT 'mysqldump'
+                    mysqldump_path    TEXT NOT NULL DEFAULT 'mysqldump',
+                    hex_blob          INTEGER NOT NULL DEFAULT 1
                 )
             """)
             conn.execute("""
@@ -54,11 +55,15 @@ class Database:
                     message    TEXT NOT NULL
                 )
             """)
-            # Add mysqldump_path column to existing installs
-            try:
-                conn.execute("ALTER TABLE jobs ADD COLUMN mysqldump_path TEXT NOT NULL DEFAULT 'mysqldump'")
-            except Exception:
-                pass
+            # Add columns for existing installs (migrations)
+            for ddl in [
+                "ALTER TABLE jobs ADD COLUMN mysqldump_path TEXT NOT NULL DEFAULT 'mysqldump'",
+                "ALTER TABLE jobs ADD COLUMN hex_blob INTEGER NOT NULL DEFAULT 1",
+            ]:
+                try:
+                    conn.execute(ddl)
+                except Exception:
+                    pass
             conn.commit()
 
     # ------------------------------------------------------------------ jobs --
@@ -72,7 +77,8 @@ class Database:
                     :databases, :tables, :schedule_type, :schedule_time,
                     :schedule_weekday, :schedule_day, :schedule_cron,
                     :output_dir, :output_type, :use_zip, :zip_password,
-                    :zip_path, :enabled, :last_run, :last_status, :mysqldump_path
+                    :zip_path, :enabled, :last_run, :last_status, :mysqldump_path,
+                    :hex_blob
                 )
             """, d)
             conn.commit()

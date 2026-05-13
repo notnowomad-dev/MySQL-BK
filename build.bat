@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo =====================================================
@@ -7,20 +7,50 @@ echo  MySQL Backup Scheduler - Build EXE
 echo =====================================================
 echo.
 
-:: Check Python
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Python not found in PATH.
-    echo Install Python 3.10+ from https://python.org
+set PYTHON=
+
+:: Try python from PATH first — skip if pip is missing (e.g. Inkscape's bundled Python)
+python -m pip --version >nul 2>&1
+if !errorlevel! equ 0 set PYTHON=python
+
+:: Scan common install locations newest-first
+if not defined PYTHON (
+    echo Python in PATH has no pip, scanning known locations...
+    for %%P in (
+        "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+        "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+        "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+        "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+        "C:\Python313\python.exe"
+        "C:\Python312\python.exe"
+        "C:\Python311\python.exe"
+        "C:\Python310\python.exe"
+        "C:\Program Files\Python313\python.exe"
+        "C:\Program Files\Python312\python.exe"
+        "C:\Program Files\Python311\python.exe"
+        "C:\Program Files\Python310\python.exe"
+    ) do (
+        if not defined PYTHON if exist "%%~P" (
+            "%%~P" -m pip --version >nul 2>&1
+            if !errorlevel! equ 0 set "PYTHON=%%~P"
+        )
+    )
+)
+
+if not defined PYTHON (
+    echo ERROR: No usable Python ^(3.10+^) with pip found.
+    echo Install Python from https://python.org and ensure pip is available.
     pause & exit /b 1
 )
-python --version
 
-:: Upgrade PyInstaller to a version that supports the current Python
+echo Found: "!PYTHON!"
+"!PYTHON!" --version
+
+:: Upgrade PyInstaller
 echo.
 echo [1/4] Upgrading PyInstaller...
-python -m pip install --upgrade "pyinstaller>=6.0" --quiet
-if %errorlevel% neq 0 (
+"!PYTHON!" -m pip install --upgrade "pyinstaller>=6.0" --quiet
+if !errorlevel! neq 0 (
     echo ERROR: Failed to upgrade PyInstaller.
     pause & exit /b 1
 )
@@ -28,8 +58,8 @@ if %errorlevel% neq 0 (
 :: Ensure runtime deps are present
 echo.
 echo [2/4] Verifying dependencies...
-python -m pip install -r requirements.txt --quiet
-if %errorlevel% neq 0 (
+"!PYTHON!" -m pip install -r requirements.txt --quiet
+if !errorlevel! neq 0 (
     echo ERROR: Failed to install dependencies.
     pause & exit /b 1
 )
@@ -43,8 +73,8 @@ if exist dist   rmdir /s /q dist
 :: Build
 echo.
 echo [4/4] Building executable (this may take a minute)...
-python -m PyInstaller mysql_backup.spec
-if %errorlevel% neq 0 (
+"!PYTHON!" -m PyInstaller mysql_backup.spec
+if !errorlevel! neq 0 (
     echo.
     echo =====================================================
     echo  Build FAILED. See output above for details.

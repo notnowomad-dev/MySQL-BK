@@ -28,6 +28,7 @@ class BackupJob:
     last_run: Optional[str] = None
     last_status: str = ""
     mysqldump_path: str = "mysqldump"
+    hex_blob: bool = True
 
     def to_dict(self) -> dict:
         d = asdict(self)

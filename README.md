@@ -52,6 +52,16 @@ Then launch with **`run.vbs`** (double-click) — starts the app with no CMD win
 
 `run.bat` is kept for debugging only; it shows a console so startup errors (e.g. missing imports) are visible.
 
+> **Python auto-detection** — `setup.bat` and `run.bat` find Python automatically without requiring it to be on `PATH`. They first check the system `python` command but only accept it if `pip` is functional (this filters out embedded Pythons such as the one bundled with Inkscape). If that check fails, they scan the following locations in order, newest version first:
+>
+> | Location pattern | Example |
+> |---|---|
+> | `%LOCALAPPDATA%\Programs\Python\PythonXXX\` | Standard Python installer (per-user) |
+> | `C:\PythonXXX\` | Custom root-level install |
+> | `C:\Program Files\PythonXXX\` | System-wide install |
+>
+> Versions checked: 3.13, 3.12, 3.11, 3.10. If none are found an error message is shown with a link to python.org.
+
 ---
 
 ## Building the executable
@@ -60,7 +70,7 @@ Then launch with **`run.vbs`** (double-click) — starts the app with no CMD win
 build.bat
 ```
 
-This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained and can be copied anywhere.
+This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained and can be copied anywhere. `build.bat` uses the same Python auto-detection logic as `setup.bat` (see above).
 
 ---
 
@@ -127,6 +137,8 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 - Optionally set a **password**; the archive will use AES-256 encryption with header encryption (`-mhe=on`).
 - The path to `7z.exe` can be changed if 7-Zip is installed in a non-default location.
 
+**Use --hex-blob** — when checked, BLOB and BINARY columns are exported as hexadecimal strings (e.g. `0x89504e47…`) instead of raw binary. This prevents encoding issues when the dump file is opened as UTF-8 text and is recommended whenever your schema contains image, file, or binary data. Enabled by default.
+
 **Enable job** — uncheck to save the job without scheduling it.
 
 ---
@@ -175,6 +187,12 @@ Open the Logs viewer (toolbar or right-click menu) to read the full error messag
 
 **Application won't start / database error**
 Delete `%APPDATA%\MySQLBackup\jobs.db` to reset all job data and start fresh.
+
+**`setup.bat` / `build.bat` picks the wrong Python**
+The scripts skip any Python that does not have `pip` available and scan a fixed list of common install paths. If your Python is in a non-standard location, either add it to your system `PATH` (and ensure `pip` is installed) or run the install command manually:
+```bat
+C:\your\python\path\python.exe -m pip install -r requirements.txt
+```
 
 ---
 

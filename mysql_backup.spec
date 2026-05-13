@@ -83,5 +83,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,           # replace with 'assets/icon.ico' if you add one
+    icon='assets/icon.ico',           # replace with 'assets/icon.ico' / None if you add one
 )

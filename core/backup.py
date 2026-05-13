@@ -158,8 +158,9 @@ class BackupRunner:
             "--single-transaction",
             "--routines",
             "--triggers",
-            "--hex-blob",
         ]
+        if self.job.hex_blob:
+            cmd.append("--hex-blob")
         if self.job.password:
             cmd.append(f"--password={self.job.password}")
         return cmd

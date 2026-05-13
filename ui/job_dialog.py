@@ -250,6 +250,10 @@ class JobDialog(QDialog):
         zip_form.addRow("Password:", self._zip_pass)
         form.addRow(zip_box)
 
+        self._hex_blob = QCheckBox("Use --hex-blob  (dump BLOB/BINARY columns as hex — safer for binary data)")
+        self._hex_blob.setChecked(True)
+        form.addRow(self._hex_blob)
+
         self._enabled = QCheckBox("Enable this job (run on schedule)")
         self._enabled.setChecked(True)
         form.addRow(self._enabled)
@@ -403,6 +407,7 @@ class JobDialog(QDialog):
         self._use_zip.setChecked(job.use_zip)
         self._zip_path.setText(job.zip_path)
         self._zip_pass.setText(job.zip_password)
+        self._hex_blob.setChecked(job.hex_blob)
         self._enabled.setChecked(job.enabled)
 
     def _accept(self):
@@ -439,6 +444,7 @@ class JobDialog(QDialog):
         job.use_zip = self._use_zip.isChecked()
         job.zip_path = self._zip_path.text().strip()
         job.zip_password = self._zip_pass.text()
+        job.hex_blob = self._hex_blob.isChecked()
         job.enabled = self._enabled.isChecked()
 
         # Collect selected databases / tables from tree
