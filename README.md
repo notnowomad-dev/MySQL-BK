@@ -1,11 +1,12 @@
 # MySQL Backup Scheduler
 
-A Windows desktop application for scheduling automated MySQL database backups with a clean GUI. Built as a reliable replacement for brittle `.bat` + Task Scheduler setups.
+A Windows desktop application for scheduling automated **MySQL and Microsoft SQL Server** database backups with a clean GUI. Built as a reliable replacement for brittle `.bat` + Task Scheduler setups.
 
 ---
 
 ## Features
 
+- **MySQL and MSSQL support** — connect to MySQL/MariaDB servers or Microsoft SQL Server (via ODBC); same scheduling and output options for both
 - **Multiple backup jobs** — create, edit, enable/disable, and delete independent jobs
 - **Flexible scheduling** — Hourly, Daily, Weekly, Monthly, or custom Cron expression
 - **Selective backup** — pick specific databases and/or individual tables per job
@@ -29,8 +30,9 @@ A Windows desktop application for scheduling automated MySQL database backups wi
 | Requirement | Notes |
 |---|---|
 | Windows 10 / 11 or Server 2019+ | 64-bit |
-| MySQL server | Local or remote |
-| `mysqldump.exe` | Comes with MySQL Server or MySQL Shell |
+| MySQL server | Local or remote (for MySQL jobs) |
+| `mysqldump.exe` | Comes with MySQL Server or MySQL Shell (MySQL jobs only) |
+| SQL Server / ODBC Driver | "ODBC Driver 17/18 for SQL Server" — free from Microsoft (MSSQL jobs only) |
 | Python 3.10+ | Only needed when running from source |
 
 No third-party compression software required — ZIP is handled by Python's built-in `zipfile` module (and `pyzipper` for password-protected archives).
@@ -99,6 +101,10 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 
 ### Connection tab
 
+Select **MySQL** or **Microsoft SQL Server (MSSQL)** at the top — the form updates to show only the relevant fields.
+
+**MySQL fields**
+
 | Field | Description |
 |---|---|
 | Host | MySQL server hostname or IP (default: `localhost`) |
@@ -107,6 +113,20 @@ This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting f
 | Password | MySQL password (stored locally in SQLite) |
 | mysqldump path | Full path to `mysqldump.exe`, or just `mysqldump` if it is on `PATH` |
 | Test Connection | Verifies credentials before saving |
+
+**MSSQL fields**
+
+| Field | Description |
+|---|---|
+| Host | SQL Server hostname or IP (default: `localhost`) |
+| Port | SQL Server port (default: `1433`) |
+| Username | SQL login (leave blank when using Windows Auth) |
+| Password | SQL login password |
+| Windows Authentication | Use the current Windows user's credentials (Trusted Connection) |
+| ODBC Driver | Select an installed SQL Server ODBC driver; the dropdown is populated from drivers already installed on this machine |
+| Test Connection | Verifies credentials before saving |
+
+> **MSSQL backup method:** jobs generate a T-SQL script (CREATE TABLE + INSERT statements) via `pyodbc` — no `sqlcmd`, `bcp`, or server-side backup required. System databases (`master`, `tempdb`, `model`, `msdb`) are excluded automatically.
 
 ### Databases tab
 
@@ -186,7 +206,10 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 ## Troubleshooting
 
 **`mysqldump not found`**
-Set the full path to `mysqldump.exe` in the Connection tab (e.g. `C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe`), or add the MySQL `bin` folder to your system `PATH`.
+Set the full path to `mysqldump.exe` in the Connection tab (e.g. `C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe`), or add the MySQL `bin` folder to your system `PATH`. This only applies to MySQL jobs — MSSQL jobs do not use `mysqldump`.
+
+**MSSQL connection fails / no drivers listed**
+Install the [Microsoft ODBC Driver for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server). Driver 17 or 18 is recommended. After installing, reopen the job dialog — the driver dropdown is populated at dialog open time.
 
 **Application fails to start with a DLL error**
 The pre-built `.exe` bundles `vc_redist.x64.exe` and installs it automatically. If the error persists:
@@ -220,7 +243,9 @@ C:\your\python\path\python.exe -m pip install -r requirements.txt
 | GUI | [PyQt5](https://pypi.org/project/PyQt5/) |
 | Scheduler | [APScheduler](https://apscheduler.readthedocs.io/) 3.x |
 | MySQL connectivity | [mysql-connector-python](https://pypi.org/project/mysql-connector-python/) |
-| Backup engine | `mysqldump` (system binary) |
+| MySQL backup engine | `mysqldump` (system binary) |
+| MSSQL connectivity | [pyodbc](https://pypi.org/project/pyodbc/) via ODBC Driver for SQL Server |
+| MSSQL backup engine | T-SQL scripting via `pyodbc` (no server tools required) |
 | Compression | Python `zipfile` (built-in) + [pyzipper](https://pypi.org/project/pyzipper/) for AES-256 passwords |
 | Job storage | SQLite via Python `sqlite3` |
 | Packaging | [PyInstaller](https://pyinstaller.org/) |
@@ -240,8 +265,10 @@ MySQL-BK/
 ├── build.bat               # Build standalone .exe
 ├── core/
 │   ├── autostart.py        # Windows registry autostart helper
-│   ├── backup.py           # BackupRunner — mysqldump + ZIP compression
+│   ├── backup.py           # BackupRunner — mysqldump + ZIP compression (dispatches to MSSQL runner)
 │   ├── db_connector.py     # MySQLConnector — lists databases/tables
+│   ├── mssql_connector.py  # MSSQLConnector — lists databases/tables via pyodbc
+│   ├── mssql_backup.py     # MSSQLBackupRunner — T-SQL scripting via pyodbc
 │   └── scheduler.py        # BackupScheduler — APScheduler wrapper
 ├── models/
 │   └── job.py              # BackupJob dataclass
