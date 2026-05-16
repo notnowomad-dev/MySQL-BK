@@ -20,6 +20,9 @@ class BackupRunner:
     def run(self, progress: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
         try:
             os.makedirs(self.job.output_dir, exist_ok=True)
+            if self.job.db_type == "mssql":
+                from core.mssql_backup import MSSQLBackupRunner
+                return MSSQLBackupRunner(self.job).run(progress)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             if self.job.output_type == "daily_overwrite":
                 return self._run_daily_overwrite(progress)

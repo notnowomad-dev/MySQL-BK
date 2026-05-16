@@ -42,7 +42,10 @@ class Database:
                     last_run          TEXT,
                     last_status       TEXT NOT NULL DEFAULT '',
                     mysqldump_path    TEXT NOT NULL DEFAULT 'mysqldump',
-                    hex_blob          INTEGER NOT NULL DEFAULT 1
+                    hex_blob          INTEGER NOT NULL DEFAULT 1,
+                    db_type           TEXT NOT NULL DEFAULT 'mysql',
+                    mssql_driver      TEXT NOT NULL DEFAULT 'ODBC Driver 17 for SQL Server',
+                    windows_auth      INTEGER NOT NULL DEFAULT 0
                 )
             """)
             conn.execute("""
@@ -59,6 +62,9 @@ class Database:
             for ddl in [
                 "ALTER TABLE jobs ADD COLUMN mysqldump_path TEXT NOT NULL DEFAULT 'mysqldump'",
                 "ALTER TABLE jobs ADD COLUMN hex_blob INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE jobs ADD COLUMN db_type TEXT NOT NULL DEFAULT 'mysql'",
+                "ALTER TABLE jobs ADD COLUMN mssql_driver TEXT NOT NULL DEFAULT 'ODBC Driver 17 for SQL Server'",
+                "ALTER TABLE jobs ADD COLUMN windows_auth INTEGER NOT NULL DEFAULT 0",
             ]:
                 try:
                     conn.execute(ddl)
@@ -78,7 +84,7 @@ class Database:
                     :schedule_weekday, :schedule_day, :schedule_cron,
                     :output_dir, :output_type, :use_zip, :zip_password,
                     :zip_path, :enabled, :last_run, :last_status, :mysqldump_path,
-                    :hex_blob
+                    :hex_blob, :db_type, :mssql_driver, :windows_auth
                 )
             """, d)
             conn.commit()

@@ -29,6 +29,9 @@ class BackupJob:
     last_status: str = ""
     mysqldump_path: str = "mysqldump"
     hex_blob: bool = True
+    db_type: str = "mysql"           # mysql | mssql
+    mssql_driver: str = "ODBC Driver 17 for SQL Server"
+    windows_auth: bool = False
 
     def to_dict(self) -> dict:
         d = asdict(self)

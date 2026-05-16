@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTime, QTimer
 
 from core.db_connector import MySQLConnector
+from core.mssql_connector import MSSQLConnector
 from models.job import BackupJob
 
 
@@ -17,12 +18,11 @@ class JobDialog(QDialog):
         super().__init__(parent)
         self._job = job or BackupJob()
         self.setWindowTitle("Add Backup Job" if job is None else "Edit Backup Job")
-        self.setMinimumSize(720, 560)
-        self._connector: Optional[MySQLConnector] = None
+        self.setMinimumSize(720, 580)
+        self._connector = None
         self._setup_ui()
         if job:
             self._load_job(job)
-            # Auto-load databases after dialog is shown; status label shows result, no popup on failure
             QTimer.singleShot(200, lambda: self._load_databases(silent=True))
         self._update_schedule_widgets()
 
@@ -56,34 +56,74 @@ class JobDialog(QDialog):
 
     def _tab_connection(self) -> QWidget:
         w = QWidget()
-        form = QFormLayout(w)
-        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        vl = QVBoxLayout(w)
 
+        # DB type selector
+        type_box = QGroupBox("Database Type")
+        type_lay = QHBoxLayout(type_box)
+        self._db_type_mysql = QRadioButton("MySQL")
+        self._db_type_mssql = QRadioButton("Microsoft SQL Server (MSSQL)")
+        self._db_type_btn_group = QButtonGroup(self)
+        self._db_type_btn_group.addButton(self._db_type_mysql)
+        self._db_type_btn_group.addButton(self._db_type_mssql)
+        self._db_type_mysql.setChecked(True)
+        type_lay.addWidget(self._db_type_mysql)
+        type_lay.addWidget(self._db_type_mssql)
+        type_lay.addStretch()
+        vl.addWidget(type_box)
+
+        # Common fields
+        common_form = QFormLayout()
+        common_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self._host = QLineEdit("localhost")
-        form.addRow("Host:", self._host)
-
+        common_form.addRow("Host:", self._host)
         self._port = QSpinBox()
         self._port.setRange(1, 65535)
         self._port.setValue(3306)
-        form.addRow("Port:", self._port)
-
+        common_form.addRow("Port:", self._port)
         self._user = QLineEdit("root")
-        form.addRow("Username:", self._user)
-
+        common_form.addRow("Username:", self._user)
         self._password = QLineEdit()
         self._password.setEchoMode(QLineEdit.Password)
-        form.addRow("Password:", self._password)
+        common_form.addRow("Password:", self._password)
+        vl.addLayout(common_form)
 
+        # MySQL-specific
+        self._mysql_group = QGroupBox("MySQL Settings")
+        mysql_form = QFormLayout(self._mysql_group)
+        mysql_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self._dump_path = QLineEdit("mysqldump")
         browse = QPushButton("Browse…")
         browse.setFixedWidth(80)
         browse.clicked.connect(self._browse_dump)
         row_w = QWidget()
-        QHBoxLayout(row_w).addWidget(self._dump_path)
-        row_w.layout().addWidget(browse)
-        row_w.layout().setContentsMargins(0, 0, 0, 0)
-        form.addRow("mysqldump:", row_w)
+        rl = QHBoxLayout(row_w)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.addWidget(self._dump_path)
+        rl.addWidget(browse)
+        mysql_form.addRow("mysqldump:", row_w)
+        vl.addWidget(self._mysql_group)
 
+        # MSSQL-specific
+        self._mssql_group = QGroupBox("SQL Server Settings")
+        mssql_form = QFormLayout(self._mssql_group)
+        mssql_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self._win_auth = QCheckBox("Use Windows Authentication (Trusted Connection)")
+        mssql_form.addRow(self._win_auth)
+        self._mssql_driver = QComboBox()
+        drivers = MSSQLConnector.available_drivers()
+        if not drivers:
+            drivers = [
+                "ODBC Driver 17 for SQL Server",
+                "ODBC Driver 18 for SQL Server",
+                "SQL Server",
+            ]
+        self._mssql_driver.addItems(drivers)
+        mssql_form.addRow("ODBC Driver:", self._mssql_driver)
+        self._mssql_group.setVisible(False)
+        vl.addWidget(self._mssql_group)
+
+        # Test connection row
         test_btn = QPushButton("Test Connection")
         test_btn.clicked.connect(self._test_conn)
         self._conn_label = QLabel()
@@ -93,8 +133,22 @@ class JobDialog(QDialog):
         hl.addWidget(test_btn)
         hl.addWidget(self._conn_label)
         hl.addStretch()
-        form.addRow("", row2)
+        vl.addWidget(row2)
+        vl.addStretch()
+
+        self._db_type_mysql.toggled.connect(self._on_db_type_changed)
+        self._db_type_mssql.toggled.connect(self._on_db_type_changed)
         return w
+
+    def _on_db_type_changed(self):
+        is_mssql = self._db_type_mssql.isChecked()
+        self._mysql_group.setVisible(not is_mssql)
+        self._mssql_group.setVisible(is_mssql)
+        if is_mssql and self._port.value() == 3306:
+            self._port.setValue(1433)
+        elif not is_mssql and self._port.value() == 1433:
+            self._port.setValue(3306)
+        self._conn_label.clear()
 
     # --------------------------------------------------------- databases tab --
 
@@ -263,8 +317,16 @@ class JobDialog(QDialog):
     # ------------------------------------------------------- connection test --
 
     def _test_conn(self):
-        c = MySQLConnector(self._host.text(), self._port.value(),
-                           self._user.text(), self._password.text())
+        if self._db_type_mssql.isChecked():
+            c = MSSQLConnector(
+                self._host.text(), self._port.value(),
+                self._user.text(), self._password.text(),
+                driver=self._mssql_driver.currentText(),
+                windows_auth=self._win_auth.isChecked(),
+            )
+        else:
+            c = MySQLConnector(self._host.text(), self._port.value(),
+                               self._user.text(), self._password.text())
         ok, msg = c.test_connection()
         self._conn_label.setText(msg)
         self._conn_label.setStyleSheet("color: green" if ok else "color: red")
@@ -277,8 +339,16 @@ class JobDialog(QDialog):
         self._db_status.setStyleSheet("color: grey; font-style: italic;")
         self._db_status.setText("Connecting…")
 
-        c = MySQLConnector(self._host.text(), self._port.value(),
-                           self._user.text(), self._password.text())
+        if self._db_type_mssql.isChecked():
+            c = MSSQLConnector(
+                self._host.text(), self._port.value(),
+                self._user.text(), self._password.text(),
+                driver=self._mssql_driver.currentText(),
+                windows_auth=self._win_auth.isChecked(),
+            )
+        else:
+            c = MySQLConnector(self._host.text(), self._port.value(),
+                               self._user.text(), self._password.text())
         ok, msg = c.test_connection()
         if not ok:
             self._db_status.setStyleSheet("color: red;")
@@ -364,6 +434,15 @@ class JobDialog(QDialog):
 
     def _load_job(self, job: BackupJob):
         self._name.setText(job.name)
+        # DB type must be set before host/port so _on_db_type_changed doesn't clobber port
+        if job.db_type == "mssql":
+            self._db_type_mssql.setChecked(True)
+        else:
+            self._db_type_mysql.setChecked(True)
+        idx = self._mssql_driver.findText(job.mssql_driver)
+        if idx >= 0:
+            self._mssql_driver.setCurrentIndex(idx)
+        self._win_auth.setChecked(job.windows_auth)
         self._host.setText(job.host)
         self._port.setValue(job.port)
         self._user.setText(job.username)
@@ -426,6 +505,9 @@ class JobDialog(QDialog):
         job.zip_password = self._zip_pass.text()
         job.hex_blob = self._hex_blob.isChecked()
         job.enabled = self._enabled.isChecked()
+        job.db_type = "mssql" if self._db_type_mssql.isChecked() else "mysql"
+        job.mssql_driver = self._mssql_driver.currentText()
+        job.windows_auth = self._win_auth.isChecked()
 
         # Collect selected databases / tables from tree
         job.databases = []

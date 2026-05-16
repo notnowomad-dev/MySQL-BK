@@ -45,6 +45,8 @@ a = Analysis(
         'mysql.connector.locales.eng',
         # Single-instance socket
         'PyQt5.QtNetwork',
+        # MSSQL
+        'pyodbc',
         # compression
         'pyzipper',
         'zipfile',
