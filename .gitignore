@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# PyInstaller build artifacts
+build/
+*.spec.bak
+
+# Claude Code settings
+.claude/
+
+# Misc
+*.log
+Thumbs.db
