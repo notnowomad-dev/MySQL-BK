@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo =====================================================
-echo  MySQL Backup Scheduler - Build EXE
+echo  Database Backup Scheduler - Build EXE
 echo =====================================================
 echo.
 
@@ -103,10 +103,10 @@ if !errorlevel! neq 0 (
 echo.
 echo =====================================================
 echo  Build complete!
-echo  Output: dist\MySQL-Backup-Scheduler.exe
+echo  Output: dist\Database-Backup-Scheduler.exe
 echo =====================================================
 echo.
-echo You can now copy MySQL-Backup-Scheduler.exe anywhere
+echo You can now copy Database-Backup-Scheduler.exe anywhere
 echo and run it without installing Python.
 echo.
 pause

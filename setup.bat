@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo ========================================
-echo  MySQL Backup Scheduler - Setup
+echo  Database Backup Scheduler - Setup
 echo ========================================
 echo.
 

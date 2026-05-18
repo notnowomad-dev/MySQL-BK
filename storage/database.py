@@ -1,9 +1,16 @@
-import sqlite3
 import os
+import shutil
+import sqlite3
 from typing import List, Optional
 from models.job import BackupJob
 
-DB_PATH = os.path.join(os.path.expanduser("~"), ".mysql_backup_scheduler", "jobs.db")
+DB_PATH = os.path.join(os.path.expanduser("~"), ".database_backup_scheduler", "jobs.db")
+_OLD_DB_PATH = os.path.join(os.path.expanduser("~"), ".mysql_backup_scheduler", "jobs.db")
+
+# Migrate from old folder name on first run after rename
+if os.path.exists(_OLD_DB_PATH) and not os.path.exists(DB_PATH):
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    shutil.copy2(_OLD_DB_PATH, DB_PATH)
 
 
 class Database:

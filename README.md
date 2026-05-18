@@ -1,4 +1,4 @@
-# MySQL Backup Scheduler
+# Database Backup Scheduler
 
 A Windows desktop application for scheduling automated **MySQL and Microsoft SQL Server** database backups with a clean GUI. Built as a reliable replacement for brittle `.bat` + Task Scheduler setups.
 
@@ -46,7 +46,7 @@ No third-party compression software required — ZIP is handled by Python's buil
 
 ### Option A — Pre-built executable (recommended)
 
-Download `MySQL-Backup-Scheduler.exe` from the `dist/` folder (or the Releases page) and run it directly. No Python installation required. The Microsoft Visual C++ Redistributable is bundled and installed automatically if missing.
+Download `Database-Backup-Scheduler.exe` from the `dist/` folder (or the Releases page) and run it directly. No Python installation required. The Microsoft Visual C++ Redistributable is bundled and installed automatically if missing.
 
 ### Option B — Run from source
 
@@ -79,7 +79,7 @@ Then launch with **`run.vbs`** (double-click) — starts the app with no CMD win
 build.bat
 ```
 
-This produces `dist\MySQL-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained — no Python, VC++ runtime, or compression software needed on the target machine. `build.bat` also downloads `vc_redist.x64.exe` automatically (if not already present) so it can be bundled into the exe.
+This produces `dist\Database-Backup-Scheduler.exe` via PyInstaller. The resulting file is fully self-contained — no Python, VC++ runtime, or compression software needed on the target machine. `build.bat` also downloads `vc_redist.x64.exe` automatically (if not already present) so it can be bundled into the exe.
 
 ---
 
@@ -214,7 +214,7 @@ Right-clicking a row shows the same actions plus **Open Destination Folder** and
 
 | Path | Contents |
 |---|---|
-| `%USERPROFILE%\.mysql_backup_scheduler\jobs.db` | SQLite database storing all jobs and logs |
+| `%USERPROFILE%\.database_backup_scheduler\jobs.db` | SQLite database storing all jobs and logs |
 | Output directory (per job) | Generated `.sql`, `.zip`, or `.bak` backup files |
 | Alternate destination (per job) | Copy of the above files, if alternate destination is configured |
 | Next to the `.exe` | `startup_error.log` — written automatically if the app fails to start |
@@ -247,7 +247,7 @@ Open the Logs viewer (toolbar or right-click menu) to read the full error messag
 Ensure `pyzipper` is installed by running `setup.bat`. For the pre-built exe it is bundled automatically. Without `pyzipper`, zips are created without a password.
 
 **Application won't start / database error**
-Delete `%USERPROFILE%\.mysql_backup_scheduler\jobs.db` to reset all job data and start fresh.
+Delete `%USERPROFILE%\.database_backup_scheduler\jobs.db` to reset all job data and start fresh.
 
 **`setup.bat` / `build.bat` picks the wrong Python**
 The scripts skip any Python that does not have `pip` available and scan a fixed list of common install paths. If your Python is in a non-standard location, either add it to your system `PATH` (and ensure `pip` is installed) or run the install command manually:

@@ -7,7 +7,7 @@ try:
 except ImportError:
     _AVAILABLE = False
 
-_APP_NAME = "MySQLBackupScheduler"
+_APP_NAME = "DatabaseBackupScheduler"
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 

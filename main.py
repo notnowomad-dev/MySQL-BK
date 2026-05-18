@@ -51,10 +51,10 @@ def _write_startup_log(exc: Exception) -> str:
         open(log_path, "w").close()
     except Exception:
         import tempfile
-        log_path = os.path.join(tempfile.gettempdir(), "mysql_backup_startup_error.log")
+        log_path = os.path.join(tempfile.gettempdir(), "db_backup_startup_error.log")
 
     out = []
-    out.append("MySQL Backup Scheduler — Startup Error Log")
+    out.append("Database Backup Scheduler — Startup Error Log")
     out.append(f"Generated : {datetime.datetime.now()}")
     out.append("")
     out.append("=== System ===")
@@ -130,7 +130,7 @@ def _ensure_vcredist():
         0,
         "The Microsoft Visual C++ Redistributable is required but not installed.\n\n"
         "It will be installed now. A UAC prompt may appear — click Yes to continue.",
-        "MySQL Backup Scheduler — Setup",
+        "Database Backup Scheduler — Setup",
         0x40,  # MB_ICONINFORMATION
     )
 
@@ -146,7 +146,7 @@ def _ensure_vcredist():
             0,
             "Visual C++ Redistributable installed successfully.\n"
             "The application will now start.",
-            "MySQL Backup Scheduler — Setup",
+            "Database Backup Scheduler — Setup",
             0x40,
         )
     elif rc == 3010:
@@ -156,7 +156,7 @@ def _ensure_vcredist():
             "Visual C++ Redistributable installed successfully.\n\n"
             "A restart is required before the application can run.\n"
             "Please restart your computer, then launch the app again.",
-            "MySQL Backup Scheduler — Restart Required",
+            "Database Backup Scheduler — Restart Required",
             0x30,  # MB_ICONWARNING
         )
         sys.exit(0)
@@ -167,7 +167,7 @@ def _ensure_vcredist():
             "Installation was cancelled.\n\n"
             "The application cannot start without the Visual C++ Redistributable.\n"
             "Run the app again and click Yes when the UAC prompt appears.",
-            "MySQL Backup Scheduler — Setup Cancelled",
+            "Database Backup Scheduler — Setup Cancelled",
             0x30,
         )
         sys.exit(0)
@@ -177,7 +177,7 @@ def _ensure_vcredist():
             f"Installation failed (exit code {rc}).\n\n"
             "Please install manually:\n"
             "https://aka.ms/vs/17/release/vc_redist.x64.exe",
-            "MySQL Backup Scheduler — Setup Failed",
+            "Database Backup Scheduler — Setup Failed",
             0x10,  # MB_ICONERROR
         )
         sys.exit(1)
@@ -213,7 +213,7 @@ except ImportError as _err:
             "and reboot, then run the app again."
             f"{_server_note}"
         ),
-        "MySQL Backup Scheduler — Startup Error",
+        "Database Backup Scheduler — Startup Error",
         0x10,
     )
     sys.exit(1)
@@ -265,7 +265,7 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("MySQL Backup Scheduler")
+    app.setApplicationName("Database Backup Scheduler")
     app.setOrganizationName("MySQLBackup")
     app.setQuitOnLastWindowClosed(False)
 

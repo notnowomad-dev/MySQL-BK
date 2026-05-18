@@ -79,7 +79,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='MySQL-Backup-Scheduler',
+    name='Database-Backup-Scheduler',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

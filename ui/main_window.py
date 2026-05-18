@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         self.scheduler = scheduler
         self._jobs: dict[str, BackupJob] = {}
 
-        self.setWindowTitle("MySQL Backup Scheduler")
+        self.setWindowTitle("Database Backup Scheduler")
         self.setMinimumSize(950, 580)
 
         self._setup_tray()
@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self._quit)
 
         self._tray.setContextMenu(menu)
-        self._tray.setToolTip("MySQL Backup Scheduler — running in background")
+        self._tray.setToolTip("Database Backup Scheduler — running in background")
         self._tray.activated.connect(self._tray_activated)
         self._tray.show()
 
@@ -384,7 +384,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             self.hide()
             self._tray.showMessage(
-                "MySQL Backup Scheduler",
+                "Database Backup Scheduler",
                 "Minimized to tray — backups continue running.\n"
                 "Right-click the tray icon to restore or exit.",
                 QSystemTrayIcon.Information,
@@ -397,7 +397,7 @@ class MainWindow(QMainWindow):
         event.ignore()
         self.hide()
         self._tray.showMessage(
-            "MySQL Backup Scheduler",
+            "Database Backup Scheduler",
             "Running in background — backups continue.\n"
             "Right-click the tray icon to restore or exit.",
             QSystemTrayIcon.Information,
