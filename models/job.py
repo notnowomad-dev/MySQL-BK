@@ -32,6 +32,9 @@ class BackupJob:
     db_type: str = "mysql"           # mysql | mssql
     mssql_driver: str = "ODBC Driver 17 for SQL Server"
     windows_auth: bool = False
+    mssql_backup_format: str = "sql"  # sql | bak
+    alt_dest_enabled: bool = False
+    alt_dest: str = ""
 
     def to_dict(self) -> dict:
         d = asdict(self)

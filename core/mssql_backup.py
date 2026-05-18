@@ -34,6 +34,9 @@ class MSSQLBackupRunner:
             os.makedirs(self.job.output_dir, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+            if getattr(self.job, "mssql_backup_format", "sql") == "bak":
+                return self._run_bak(ts, progress)
+
             if self.job.output_type == "daily_overwrite":
                 return self._run_daily_overwrite(progress)
             if self.job.output_type == "multiple" and self.job.databases:
@@ -130,6 +133,73 @@ class MSSQLBackupRunner:
         if self.job.use_zip and output_files:
             return self._zip_daily(output_files, day, progress)
         return True, f"Daily overwrite ({day}) — {len(output_files)} file(s)"
+
+    # ------------------------------------------------------------- .bak format --
+
+    def _run_bak(self, ts: str, progress: Optional[Callable]) -> Tuple[bool, str]:
+        """Run BACKUP DATABASE ... TO DISK for each selected database."""
+        try:
+            conn = pyodbc.connect(_conn_str(self.job), timeout=10)
+            conn.autocommit = True  # BACKUP DATABASE requires autocommit
+        except Exception as e:
+            return False, f"Connection failed: {e}"
+
+        try:
+            databases = self.job.databases or self._list_databases(conn)
+            if not databases:
+                return False, "No databases to back up"
+
+            results: List[str] = []
+            for db in databases:
+                if self.job.output_type == "daily_overwrite":
+                    day = _DAYS[datetime.now().weekday()]
+                    fname = f"{_safe_name(self.job.name)}_{_safe_name(db)}_{day}.bak"
+                else:
+                    fname = f"{_safe_name(self.job.name)}_{_safe_name(db)}_{ts}.bak"
+                bak_path = os.path.normpath(os.path.join(self.job.output_dir, fname))
+
+                if progress:
+                    progress(f"BACKUP DATABASE [{db}] → {bak_path} …")
+
+                ok, msg = self._backup_database_bak(conn, db, bak_path)
+                if not ok:
+                    return False, msg
+                results.append(bak_path)
+
+            return True, f"Backup complete — {len(results)} .bak file(s)"
+        finally:
+            conn.close()
+
+    def _backup_database_bak(self, conn, db: str, bak_path: str) -> Tuple[bool, str]:
+        safe_path = bak_path.replace("'", "''")
+        safe_db = db.replace("]", "]]")
+        sql = (
+            f"BACKUP DATABASE [{safe_db}] "
+            f"TO DISK = N'{safe_path}' "
+            f"WITH INIT, NAME = N'{_safe_name(db)} backup', STATS = 10"
+        )
+        if self.job.use_zip:
+            sql += ", COMPRESSION"
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            # Drain informational result sets SQL Server may send
+            while True:
+                try:
+                    if not cursor.nextset():
+                        break
+                except Exception:
+                    break
+            return True, bak_path
+        except Exception as e:
+            msg = str(e)
+            if "error 3(" in msg or "error 5(" in msg:
+                msg += (
+                    f"\n\nHint: The directory '{os.path.dirname(bak_path)}' must already "
+                    "exist on the SQL Server machine and the SQL Server service account "
+                    "must have write permission to it."
+                )
+            return False, f"BACKUP DATABASE [{db}] failed: {msg}"
 
     # ----------------------------------------------------------------- core --
 

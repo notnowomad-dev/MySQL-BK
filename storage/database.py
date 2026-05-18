@@ -44,8 +44,11 @@ class Database:
                     mysqldump_path    TEXT NOT NULL DEFAULT 'mysqldump',
                     hex_blob          INTEGER NOT NULL DEFAULT 1,
                     db_type           TEXT NOT NULL DEFAULT 'mysql',
-                    mssql_driver      TEXT NOT NULL DEFAULT 'ODBC Driver 17 for SQL Server',
-                    windows_auth      INTEGER NOT NULL DEFAULT 0
+                    mssql_driver          TEXT NOT NULL DEFAULT 'ODBC Driver 17 for SQL Server',
+                    windows_auth          INTEGER NOT NULL DEFAULT 0,
+                    mssql_backup_format   TEXT NOT NULL DEFAULT 'sql',
+                    alt_dest_enabled      INTEGER NOT NULL DEFAULT 0,
+                    alt_dest              TEXT NOT NULL DEFAULT ''
                 )
             """)
             conn.execute("""
@@ -65,6 +68,9 @@ class Database:
                 "ALTER TABLE jobs ADD COLUMN db_type TEXT NOT NULL DEFAULT 'mysql'",
                 "ALTER TABLE jobs ADD COLUMN mssql_driver TEXT NOT NULL DEFAULT 'ODBC Driver 17 for SQL Server'",
                 "ALTER TABLE jobs ADD COLUMN windows_auth INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE jobs ADD COLUMN mssql_backup_format TEXT NOT NULL DEFAULT 'sql'",
+                "ALTER TABLE jobs ADD COLUMN alt_dest_enabled INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE jobs ADD COLUMN alt_dest TEXT NOT NULL DEFAULT ''",
             ]:
                 try:
                     conn.execute(ddl)
@@ -84,7 +90,8 @@ class Database:
                     :schedule_weekday, :schedule_day, :schedule_cron,
                     :output_dir, :output_type, :use_zip, :zip_password,
                     :zip_path, :enabled, :last_run, :last_status, :mysqldump_path,
-                    :hex_blob, :db_type, :mssql_driver, :windows_auth
+                    :hex_blob, :db_type, :mssql_driver, :windows_auth, :mssql_backup_format,
+                    :alt_dest_enabled, :alt_dest
                 )
             """, d)
             conn.commit()

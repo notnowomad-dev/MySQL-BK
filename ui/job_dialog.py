@@ -140,6 +140,9 @@ class JobDialog(QDialog):
         self._db_type_mssql.toggled.connect(self._on_db_type_changed)
         return w
 
+    def _on_mssql_fmt_changed(self):
+        self._bak_warning.setVisible(self._mssql_fmt_bak_rb.isChecked())
+
     def _on_db_type_changed(self):
         is_mssql = self._db_type_mssql.isChecked()
         self._mysql_group.setVisible(not is_mssql)
@@ -149,6 +152,9 @@ class JobDialog(QDialog):
         elif not is_mssql and self._port.value() == 1433:
             self._port.setValue(3306)
         self._conn_label.clear()
+        if hasattr(self, "_mssql_fmt_box"):
+            self._mssql_fmt_box.setVisible(is_mssql)
+            self._hex_blob.setVisible(not is_mssql)
 
     # --------------------------------------------------------- databases tab --
 
@@ -281,6 +287,44 @@ class JobDialog(QDialog):
         self._single_rb.setChecked(True)
         form.addRow(fmt_box)
 
+        self._mssql_fmt_box = QGroupBox("MSSQL Backup Format")
+        mssql_fmt_lay = QVBoxLayout(self._mssql_fmt_box)
+        self._mssql_fmt_sql_rb = QRadioButton(
+            "T-SQL Script (.sql)  —  exported by this tool via pyodbc"
+        )
+        self._mssql_fmt_bak_rb = QRadioButton(
+            "Native Backup (.bak)  —  uses SQL Server's BACKUP DATABASE command"
+        )
+        self._mssql_fmt_group = QButtonGroup(self)
+        self._mssql_fmt_group.addButton(self._mssql_fmt_sql_rb)
+        self._mssql_fmt_group.addButton(self._mssql_fmt_bak_rb)
+        self._mssql_fmt_sql_rb.setChecked(True)
+        mssql_fmt_lay.addWidget(self._mssql_fmt_sql_rb)
+        mssql_fmt_lay.addWidget(self._mssql_fmt_bak_rb)
+
+        self._bak_warning = QLabel(
+            "<b>⚠ This tool must run on the SQL Server machine itself.</b><br>"
+            "BACKUP DATABASE writes the .bak file on the server, not on this PC.<br>"
+            "The <i>Output directory</i> above must be a local path on the SQL Server "
+            "(e.g. <tt>C:\\Backups</tt>) or a UNC share the SQL Server service account "
+            "can write to.<br>"
+            "Running this tool from a remote/client PC will fail with a path-not-found error.<br>"
+            "<br>Checking <i>Compress</i> below adds SQL Server native compression "
+            "(WITH COMPRESSION) — no .zip is created."
+        )
+        self._bak_warning.setWordWrap(True)
+        self._bak_warning.setStyleSheet(
+            "background:#fff3cd; border:1px solid #ffc107; border-radius:4px; "
+            "padding:8px; color:#856404;"
+        )
+        self._bak_warning.setVisible(False)
+        mssql_fmt_lay.addWidget(self._bak_warning)
+
+        self._mssql_fmt_sql_rb.toggled.connect(self._on_mssql_fmt_changed)
+        self._mssql_fmt_bak_rb.toggled.connect(self._on_mssql_fmt_changed)
+        self._mssql_fmt_box.setVisible(False)
+        form.addRow(self._mssql_fmt_box)
+
         zip_box = QGroupBox("Compression")
         zip_form = QFormLayout(zip_box)
 
@@ -300,6 +344,30 @@ class JobDialog(QDialog):
         self._enabled = QCheckBox("Enable this job (run on schedule)")
         self._enabled.setChecked(True)
         form.addRow(self._enabled)
+
+        alt_box = QGroupBox("Alternate Destination")
+        alt_lay = QVBoxLayout(alt_box)
+        self._alt_dest_enabled = QCheckBox(
+            "Copy completed backup files to an alternate destination"
+        )
+        alt_lay.addWidget(self._alt_dest_enabled)
+
+        self._alt_dest = QLineEdit()
+        self._alt_dest.setPlaceholderText("Select alternate destination folder…")
+        alt_br = QPushButton("Browse…")
+        alt_br.setFixedWidth(80)
+        alt_br.clicked.connect(self._browse_altdest)
+        alt_row = QWidget()
+        alt_hl = QHBoxLayout(alt_row)
+        alt_hl.setContentsMargins(0, 0, 0, 0)
+        alt_hl.addWidget(self._alt_dest)
+        alt_hl.addWidget(alt_br)
+        alt_lay.addWidget(alt_row)
+
+        self._alt_dest_row = alt_row
+        self._alt_dest_row.setEnabled(False)
+        self._alt_dest_enabled.toggled.connect(self._alt_dest_row.setEnabled)
+        form.addRow(alt_box)
         return w
 
     # ------------------------------------------------------- browse helpers --
@@ -313,6 +381,11 @@ class JobDialog(QDialog):
         p = QFileDialog.getExistingDirectory(self, "Select output directory")
         if p:
             self._out_dir.setText(p)
+
+    def _browse_altdest(self):
+        p = QFileDialog.getExistingDirectory(self, "Select alternate destination")
+        if p:
+            self._alt_dest.setText(p)
 
     # ------------------------------------------------------- connection test --
 
@@ -469,6 +542,13 @@ class JobDialog(QDialog):
         self._zip_pass.setText(job.zip_password)
         self._hex_blob.setChecked(job.hex_blob)
         self._enabled.setChecked(job.enabled)
+        if getattr(job, "mssql_backup_format", "sql") == "bak":
+            self._mssql_fmt_bak_rb.setChecked(True)
+        else:
+            self._mssql_fmt_sql_rb.setChecked(True)
+        self._alt_dest_enabled.setChecked(job.alt_dest_enabled)
+        self._alt_dest.setText(job.alt_dest)
+        self._alt_dest_row.setEnabled(job.alt_dest_enabled)
 
     def _accept(self):
         if not self._name.text().strip():
@@ -508,6 +588,9 @@ class JobDialog(QDialog):
         job.db_type = "mssql" if self._db_type_mssql.isChecked() else "mysql"
         job.mssql_driver = self._mssql_driver.currentText()
         job.windows_auth = self._win_auth.isChecked()
+        job.mssql_backup_format = "bak" if self._mssql_fmt_bak_rb.isChecked() else "sql"
+        job.alt_dest_enabled = self._alt_dest_enabled.isChecked()
+        job.alt_dest = self._alt_dest.text().strip()
 
         # Collect selected databases / tables from tree
         job.databases = []

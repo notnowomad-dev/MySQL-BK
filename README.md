@@ -14,12 +14,15 @@ A Windows desktop application for scheduling automated **MySQL and Microsoft SQL
   - Single `.sql` file (all selected DBs merged)
   - Multiple `.sql` files (one per database or table)
   - Daily overwrite — 7 rotating files (`mon.sql` … `sun.sql`) that overwrite each week
+- **MSSQL backup formats** — T-SQL Script (`.sql`) via pyodbc from any machine, or Native Backup (`.bak`) using SQL Server's `BACKUP DATABASE` command (must run on the server)
+- **Alternate destination** — optionally copy completed backup files to a second folder after each run; works with all output formats
 - **ZIP compression** — optional `.zip` archive with optional AES-256 password; opens with Windows Explorer — no extra software needed
 - **BLOB/BINARY export** — optional `--hex-blob` flag exports binary columns as safe hex strings
 - **Start with Windows** — one-click autostart toggle in the system tray menu
 - **System tray** — minimizes to tray; backups keep running while the window is hidden
 - **Run Now** — trigger any job immediately from the UI
 - **Log viewer** — per-job history of every run (timestamp, status, message)
+- **Copy to clipboard** — select rows in the job list and press Ctrl+C (or right-click → Copy Row) to copy as tab-separated text
 - **Single-instance** — launching a second copy restores the existing window instead
 - **VC++ auto-install** — bundles the Microsoft Visual C++ Redistributable and installs it automatically if missing
 
@@ -126,7 +129,9 @@ Select **MySQL** or **Microsoft SQL Server (MSSQL)** at the top — the form upd
 | ODBC Driver | Select an installed SQL Server ODBC driver; the dropdown is populated from drivers already installed on this machine |
 | Test Connection | Verifies credentials before saving |
 
-> **MSSQL backup method:** jobs generate a T-SQL script (CREATE TABLE + INSERT statements) via `pyodbc` — no `sqlcmd`, `bcp`, or server-side backup required. System databases (`master`, `tempdb`, `model`, `msdb`) are excluded automatically.
+> **MSSQL backup methods:** two formats are available — select in the Output tab when an MSSQL job is configured.
+> - **T-SQL Script (.sql)** — exports CREATE TABLE + INSERT statements via `pyodbc`. Works from any machine on the network. No server-side tools required. System databases (`master`, `tempdb`, `model`, `msdb`) are excluded automatically.
+> - **Native Backup (.bak)** — runs `BACKUP DATABASE [db] TO DISK` directly on SQL Server. **This tool must run on the SQL Server machine itself** (or the output path must be a UNC share the SQL Server service account can write to). Running remotely from a client PC will fail with a path-not-found error.
 
 ### Databases tab
 
@@ -147,21 +152,31 @@ Select **MySQL** or **Microsoft SQL Server (MSSQL)** at the top — the form upd
 
 ### Output tab
 
-**SQL output format**
+**Output file structure**
 
 | Mode | Behaviour |
 |---|---|
-| Single `.sql` file | All selected databases dumped into one timestamped file |
-| Multiple `.sql` files | One file per database, or one per table when specific tables are selected |
-| Daily overwrite | Produces `jobname_dbname_mon.sql` … `jobname_dbname_sun.sql`; each weekday's file overwrites the previous week's — capped at 7 files per database |
+| Single file | All selected databases dumped into one timestamped file |
+| Multiple files | One file per database, or one per table when specific tables are selected |
+| Daily overwrite | Produces `jobname_dbname_mon.*` … `jobname_dbname_sun.*`; each weekday's file overwrites the previous week's — capped at 7 files per database |
+
+**MSSQL Backup Format** *(visible only for MSSQL jobs)*
+
+| Format | Behaviour |
+|---|---|
+| T-SQL Script (.sql) | Exports CREATE TABLE + INSERT via pyodbc; runs from any machine |
+| Native Backup (.bak) | Uses `BACKUP DATABASE TO DISK`; tool must run on the SQL Server machine; enabling Compress adds `WITH COMPRESSION` (no .zip created) |
 
 **Compression**
 
 - Enable **Compress output as .zip** to produce a `.zip` archive instead of plain `.sql` files.
 - The archive opens directly in Windows Explorer — no extra software needed.
 - Optionally set a **password**; the archive will use AES-256 encryption via `pyzipper` (installed by `setup.bat`).
+- For `.bak` format, this option adds SQL Server native compression (`WITH COMPRESSION`) instead of creating a zip.
 
-**Use --hex-blob** — when checked, BLOB and BINARY columns are exported as hexadecimal strings (e.g. `0x89504e47…`) instead of raw binary. This prevents encoding issues when the dump file is opened as UTF-8 text and is recommended whenever your schema contains image, file, or binary data. Enabled by default.
+**Use --hex-blob** — when checked (MySQL jobs only), BLOB and BINARY columns are exported as hexadecimal strings (e.g. `0x89504e47…`) instead of raw binary. Prevents encoding issues when the dump is opened as UTF-8 text. Enabled by default.
+
+**Alternate Destination** — optionally copy all backup files produced by the job to a second folder immediately after each successful run. Works with every output format and compression mode. If the copy fails the job is marked Failed so you are notified.
 
 **Enable job** — uncheck to save the job without scheduling it.
 
@@ -178,7 +193,9 @@ Select **MySQL** or **Microsoft SQL Server (MSSQL)** at the top — the form upd
 | **Logs** | Open the log viewer for the selected job (or all jobs if none selected) |
 | **Exit** | Quit the application |
 
-Right-clicking a row shows the same actions plus **Open Destination Folder**.
+Right-clicking a row shows the same actions plus **Open Destination Folder** and **Copy Row**.
+
+**Copying job data** — select one or more rows and press **Ctrl+C** (or right-click → Copy Row) to copy the job details as tab-separated text, ready to paste into Excel or Notepad.
 
 ---
 
@@ -198,7 +215,8 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 | Path | Contents |
 |---|---|
 | `%USERPROFILE%\.mysql_backup_scheduler\jobs.db` | SQLite database storing all jobs and logs |
-| Output directory (per job) | Generated `.sql` or `.zip` backup files |
+| Output directory (per job) | Generated `.sql`, `.zip`, or `.bak` backup files |
+| Alternate destination (per job) | Copy of the above files, if alternate destination is configured |
 | Next to the `.exe` | `startup_error.log` — written automatically if the app fails to start |
 
 ---
@@ -207,6 +225,9 @@ Right-clicking a row shows the same actions plus **Open Destination Folder**.
 
 **`mysqldump not found`**
 Set the full path to `mysqldump.exe` in the Connection tab (e.g. `C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe`), or add the MySQL `bin` folder to your system `PATH`. This only applies to MySQL jobs — MSSQL jobs do not use `mysqldump`.
+
+**MSSQL .bak backup fails with "cannot open backup device" / path not found**
+`BACKUP DATABASE TO DISK` runs on the SQL Server, not on this PC. The output directory must exist on the SQL Server machine and the SQL Server service account must have write permission to it. If running this tool remotely, either switch to T-SQL Script (.sql) format, or use a UNC path (e.g. `\\server\share\backups`) that the SQL Server service account can reach.
 
 **MSSQL connection fails / no drivers listed**
 Install the [Microsoft ODBC Driver for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server). Driver 17 or 18 is recommended. After installing, reopen the job dialog — the driver dropdown is populated at dialog open time.
@@ -245,7 +266,7 @@ C:\your\python\path\python.exe -m pip install -r requirements.txt
 | MySQL connectivity | [mysql-connector-python](https://pypi.org/project/mysql-connector-python/) |
 | MySQL backup engine | `mysqldump` (system binary) |
 | MSSQL connectivity | [pyodbc](https://pypi.org/project/pyodbc/) via ODBC Driver for SQL Server |
-| MSSQL backup engine | T-SQL scripting via `pyodbc` (no server tools required) |
+| MSSQL backup engine | T-SQL scripting via `pyodbc` (.sql) or native `BACKUP DATABASE` (.bak) |
 | Compression | Python `zipfile` (built-in) + [pyzipper](https://pypi.org/project/pyzipper/) for AES-256 passwords |
 | Job storage | SQLite via Python `sqlite3` |
 | Packaging | [PyInstaller](https://pyinstaller.org/) |

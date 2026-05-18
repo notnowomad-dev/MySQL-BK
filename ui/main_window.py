@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QSystemTrayIcon, QMenu, QMessageBox, QToolBar, QLabel,
-    QAbstractItemView, QProgressBar, QAction,
+    QAbstractItemView, QProgressBar, QAction, QApplication,
 )
 import os
 import subprocess
@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self._table.doubleClicked.connect(self._edit_job)
         self._table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._show_context_menu)
+        self._table.installEventFilter(self)
 
         central = QWidget()
         lay = QVBoxLayout(central)
@@ -298,6 +299,28 @@ class MainWindow(QMainWindow):
         job_id = self._selected_job_id()
         LogViewer(self.db, job_id, parent=self).exec()
 
+    # ------------------------------------------------------- copy to clipboard --
+
+    def eventFilter(self, obj, event):
+        if obj is self._table and event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_C and (event.modifiers() & Qt.ControlModifier):
+                self._copy_selection()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _copy_selection(self):
+        rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
+        if not rows:
+            return
+        lines = []
+        for row in rows:
+            parts = []
+            for col in range(self._table.columnCount()):
+                item = self._table.item(row, col)
+                parts.append(item.text() if item else "")
+            lines.append("\t".join(parts))
+        QApplication.clipboard().setText("\n".join(lines))
+
     # --------------------------------------------------------- context menu --
 
     def _show_context_menu(self, pos):
@@ -308,6 +331,8 @@ class MainWindow(QMainWindow):
             job = self.db.get_job(job_id)
             menu.addAction("✎  Edit Job",        self._edit_job)
             menu.addAction("▶  Run Now",          self._run_now)
+            menu.addSeparator()
+            menu.addAction("⎘  Copy Row",         self._copy_selection)
             menu.addSeparator()
             open_act = menu.addAction("📁  Open Destination Folder")
             open_act.triggered.connect(lambda: self._open_folder(job.output_dir))
@@ -382,5 +407,4 @@ class MainWindow(QMainWindow):
     def _quit(self):
         self._timer.stop()
         self.scheduler.stop()
-        from PyQt5.QtWidgets import QApplication
         QApplication.quit()

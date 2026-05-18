@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+import time
 import zipfile
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple
@@ -20,15 +22,27 @@ class BackupRunner:
     def run(self, progress: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
         try:
             os.makedirs(self.job.output_dir, exist_ok=True)
+            since = time.time()
+
             if self.job.db_type == "mssql":
                 from core.mssql_backup import MSSQLBackupRunner
-                return MSSQLBackupRunner(self.job).run(progress)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            if self.job.output_type == "daily_overwrite":
-                return self._run_daily_overwrite(progress)
-            if self.job.output_type == "multiple" and self.job.databases:
-                return self._run_multiple(ts, progress)
-            return self._run_single(ts, progress)
+                ok, msg = MSSQLBackupRunner(self.job).run(progress)
+            else:
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                if self.job.output_type == "daily_overwrite":
+                    ok, msg = self._run_daily_overwrite(progress)
+                elif self.job.output_type == "multiple" and self.job.databases:
+                    ok, msg = self._run_multiple(ts, progress)
+                else:
+                    ok, msg = self._run_single(ts, progress)
+
+            if ok and self.job.alt_dest_enabled and self.job.alt_dest:
+                alt_ok, alt_msg = self._copy_to_alt_dest(since, progress)
+                msg = f"{msg} | {alt_msg}"
+                if not alt_ok:
+                    return False, msg
+
+            return ok, msg
         except Exception as e:
             return False, f"Unexpected error: {e}"
 
@@ -203,6 +217,29 @@ class BackupRunner:
             return True, f"Compressed: {arc_path}"
         except Exception as e:
             return False, f"Compression error: {e}"
+
+    def _copy_to_alt_dest(
+        self, since: float, progress: Optional[Callable]
+    ) -> Tuple[bool, str]:
+        alt = self.job.alt_dest
+        try:
+            os.makedirs(alt, exist_ok=True)
+        except Exception as e:
+            return False, f"Cannot create alternate destination '{alt}': {e}"
+        try:
+            copied = []
+            for fname in os.listdir(self.job.output_dir):
+                fpath = os.path.join(self.job.output_dir, fname)
+                if os.path.isfile(fpath) and os.path.getmtime(fpath) >= since - 1:
+                    shutil.copy2(fpath, os.path.join(alt, fname))
+                    copied.append(fname)
+                    if progress:
+                        progress(f"Alt dest: copied {fname} → {alt}")
+            if not copied:
+                return True, f"Alt dest: no new files found in {self.job.output_dir}"
+            return True, f"Alt dest: {len(copied)} file(s) copied to {alt}"
+        except Exception as e:
+            return False, f"Alt dest copy failed: {e}"
 
     def _compress(self, sql_paths: List[str], arc_path: str):
         """Write a .zip archive. Uses pyzipper for AES-256 when a password is set."""
