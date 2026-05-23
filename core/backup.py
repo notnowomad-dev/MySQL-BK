@@ -221,7 +221,9 @@ class BackupRunner:
     def _copy_to_alt_dest(
         self, since: float, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
-        alt = self.job.alt_dest
+        # Normalize to backslash UNC form (\\server\share\...) so os.makedirs
+        # correctly identifies the share root and doesn't try to create it.
+        alt = os.path.normpath(self.job.alt_dest)
         try:
             os.makedirs(alt, exist_ok=True)
         except Exception as e:
