@@ -224,10 +224,18 @@ class BackupRunner:
         # Normalize to backslash UNC form (\\server\share\...) so os.makedirs
         # correctly identifies the share root and doesn't try to create it.
         alt = os.path.normpath(self.job.alt_dest)
-        try:
-            os.makedirs(alt, exist_ok=True)
-        except Exception as e:
-            return False, f"Cannot create alternate destination '{alt}': {e}"
+        last_err = None
+        for attempt in range(3):
+            try:
+                os.makedirs(alt, exist_ok=True)
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                if attempt < 2:
+                    time.sleep(10)
+        if last_err:
+            return False, f"Cannot create alternate destination '{alt}': {last_err}"
         try:
             copied = []
             for fname in os.listdir(self.job.output_dir):
