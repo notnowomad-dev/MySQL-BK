@@ -11,6 +11,26 @@ from models.job import BackupJob
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
+def _mapped_drive_to_unc(path: str) -> str:
+    """Replace a mapped drive letter with its UNC path read from the registry.
+    Mapped drives are session-bound and unavailable to scheduled/background runs,
+    but the registry entry persists so we can resolve it even when disconnected."""
+    import re
+    m = re.match(r'^([A-Za-z]):[/\\]', path)
+    if not m:
+        return path
+    try:
+        import winreg
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, rf"Network\{m.group(1).upper()}"
+        )
+        unc, _ = winreg.QueryValueEx(key, "RemotePath")
+        winreg.CloseKey(key)
+        return os.path.normpath(unc + path[2:])
+    except Exception:
+        return path
+
+
 def _safe_name(text: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in text)
 
@@ -221,9 +241,12 @@ class BackupRunner:
     def _copy_to_alt_dest(
         self, since: float, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
-        # Normalize to backslash UNC form (\\server\share\...) so os.makedirs
-        # correctly identifies the share root and doesn't try to create it.
-        alt = os.path.normpath(self.job.alt_dest)
+        # Resolve mapped drive letters to UNC paths so the copy works even when
+        # the drive isn't mounted in the current session (e.g. scheduled runs).
+        # Falls back to normpath for plain local/UNC paths.
+        alt = _mapped_drive_to_unc(self.job.alt_dest)
+        if alt == self.job.alt_dest:
+            alt = os.path.normpath(alt)
         last_err = None
         for attempt in range(3):
             try:
