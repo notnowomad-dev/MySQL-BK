@@ -55,7 +55,9 @@ class Database:
                     windows_auth          INTEGER NOT NULL DEFAULT 0,
                     mssql_backup_format   TEXT NOT NULL DEFAULT 'sql',
                     alt_dest_enabled      INTEGER NOT NULL DEFAULT 0,
-                    alt_dest              TEXT NOT NULL DEFAULT ''
+                    alt_dest              TEXT NOT NULL DEFAULT '',
+                    alt_dest_user         TEXT NOT NULL DEFAULT '',
+                    alt_dest_pass         TEXT NOT NULL DEFAULT ''
                 )
             """)
             conn.execute("""
@@ -78,6 +80,8 @@ class Database:
                 "ALTER TABLE jobs ADD COLUMN mssql_backup_format TEXT NOT NULL DEFAULT 'sql'",
                 "ALTER TABLE jobs ADD COLUMN alt_dest_enabled INTEGER NOT NULL DEFAULT 0",
                 "ALTER TABLE jobs ADD COLUMN alt_dest TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE jobs ADD COLUMN alt_dest_user TEXT NOT NULL DEFAULT ''",
+                "ALTER TABLE jobs ADD COLUMN alt_dest_pass TEXT NOT NULL DEFAULT ''",
             ]:
                 try:
                     conn.execute(ddl)
@@ -98,7 +102,7 @@ class Database:
                     :output_dir, :output_type, :use_zip, :zip_password,
                     :zip_path, :enabled, :last_run, :last_status, :mysqldump_path,
                     :hex_blob, :db_type, :mssql_driver, :windows_auth, :mssql_backup_format,
-                    :alt_dest_enabled, :alt_dest
+                    :alt_dest_enabled, :alt_dest, :alt_dest_user, :alt_dest_pass
                 )
             """, d)
             conn.commit()

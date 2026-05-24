@@ -35,6 +35,8 @@ class BackupJob:
     mssql_backup_format: str = "sql"  # sql | bak
     alt_dest_enabled: bool = False
     alt_dest: str = ""
+    alt_dest_user: str = ""
+    alt_dest_pass: str = ""
 
     def to_dict(self) -> dict:
         d = asdict(self)

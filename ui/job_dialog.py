@@ -352,21 +352,42 @@ class JobDialog(QDialog):
         )
         alt_lay.addWidget(self._alt_dest_enabled)
 
+        # Container holds path row + credential row; toggled as one unit
+        alt_controls = QWidget()
+        alt_controls_lay = QVBoxLayout(alt_controls)
+        alt_controls_lay.setContentsMargins(0, 0, 0, 0)
+        alt_controls_lay.setSpacing(4)
+
         self._alt_dest = QLineEdit()
-        self._alt_dest.setPlaceholderText("Select alternate destination folder…")
+        self._alt_dest.setPlaceholderText("e.g. \\\\192.168.1.10\\share\\backup  or  D:\\Backup")
         alt_br = QPushButton("Browse…")
         alt_br.setFixedWidth(80)
         alt_br.clicked.connect(self._browse_altdest)
-        alt_row = QWidget()
-        alt_hl = QHBoxLayout(alt_row)
-        alt_hl.setContentsMargins(0, 0, 0, 0)
-        alt_hl.addWidget(self._alt_dest)
-        alt_hl.addWidget(alt_br)
-        alt_lay.addWidget(alt_row)
+        alt_path_row = QWidget()
+        alt_path_hl = QHBoxLayout(alt_path_row)
+        alt_path_hl.setContentsMargins(0, 0, 0, 0)
+        alt_path_hl.addWidget(self._alt_dest)
+        alt_path_hl.addWidget(alt_br)
+        alt_controls_lay.addWidget(alt_path_row)
 
-        self._alt_dest_row = alt_row
-        self._alt_dest_row.setEnabled(False)
-        self._alt_dest_enabled.toggled.connect(self._alt_dest_row.setEnabled)
+        cred_row = QWidget()
+        cred_hl = QHBoxLayout(cred_row)
+        cred_hl.setContentsMargins(0, 0, 0, 0)
+        cred_hl.addWidget(QLabel("Username:"))
+        self._alt_dest_user = QLineEdit()
+        self._alt_dest_user.setPlaceholderText("DOMAIN\\user  (leave blank if not needed)")
+        cred_hl.addWidget(self._alt_dest_user, 1)
+        cred_hl.addSpacing(12)
+        cred_hl.addWidget(QLabel("Password:"))
+        self._alt_dest_pass = QLineEdit()
+        self._alt_dest_pass.setEchoMode(QLineEdit.Password)
+        cred_hl.addWidget(self._alt_dest_pass, 1)
+        alt_controls_lay.addWidget(cred_row)
+
+        alt_lay.addWidget(alt_controls)
+        alt_controls.setEnabled(False)
+        self._alt_dest_enabled.toggled.connect(alt_controls.setEnabled)
+        self._alt_dest_controls = alt_controls
         form.addRow(alt_box)
         return w
 
@@ -548,7 +569,9 @@ class JobDialog(QDialog):
             self._mssql_fmt_sql_rb.setChecked(True)
         self._alt_dest_enabled.setChecked(job.alt_dest_enabled)
         self._alt_dest.setText(job.alt_dest)
-        self._alt_dest_row.setEnabled(job.alt_dest_enabled)
+        self._alt_dest_user.setText(getattr(job, "alt_dest_user", ""))
+        self._alt_dest_pass.setText(getattr(job, "alt_dest_pass", ""))
+        self._alt_dest_controls.setEnabled(job.alt_dest_enabled)
 
     def _accept(self):
         if not self._name.text().strip():
@@ -591,6 +614,8 @@ class JobDialog(QDialog):
         job.mssql_backup_format = "bak" if self._mssql_fmt_bak_rb.isChecked() else "sql"
         job.alt_dest_enabled = self._alt_dest_enabled.isChecked()
         job.alt_dest = self._alt_dest.text().strip()
+        job.alt_dest_user = self._alt_dest_user.text().strip()
+        job.alt_dest_pass = self._alt_dest_pass.text()
 
         # Collect selected databases / tables from tree
         job.databases = []

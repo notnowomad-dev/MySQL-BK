@@ -11,6 +11,20 @@ from models.job import BackupJob
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
+def _register_network_credentials(path: str, user: str, password: str) -> None:
+    """Store credentials in Windows Credential Manager for the server in path."""
+    import re
+    resolved = _mapped_drive_to_unc(path) if re.match(r'^[A-Za-z]:[/\\]', path) else os.path.normpath(path)
+    m = re.match(r'^\\\\([^\\]+)\\', resolved)
+    if not m:
+        return
+    host = m.group(1)
+    subprocess.run(
+        ["cmdkey", f"/add:{host}", f"/user:{user}", f"/pass:{password}"],
+        capture_output=True, creationflags=_NO_WINDOW,
+    )
+
+
 def _mapped_drive_to_unc(path: str) -> str:
     """Replace a mapped drive letter with its UNC path read from the registry.
     Mapped drives are session-bound and unavailable to scheduled/background runs,
@@ -241,6 +255,11 @@ class BackupRunner:
     def _copy_to_alt_dest(
         self, since: float, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
+        # Register stored credentials before touching the share.
+        if getattr(self.job, "alt_dest_user", ""):
+            _register_network_credentials(
+                self.job.alt_dest, self.job.alt_dest_user, self.job.alt_dest_pass
+            )
         # Resolve mapped drive letters to UNC paths so the copy works even when
         # the drive isn't mounted in the current session (e.g. scheduled runs).
         # Falls back to normpath for plain local/UNC paths.
