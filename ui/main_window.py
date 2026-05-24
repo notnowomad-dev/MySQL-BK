@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
 
         act("＋ Add Job", self._add_job)
         act("✎  Edit", self._edit_job)
+        act("⧉  Duplicate", self._duplicate_job)
         act("✕  Delete", self._delete_job)
         bar.addSeparator()
         act("▶  Run Now", self._run_now)
@@ -231,6 +232,24 @@ class MainWindow(QMainWindow):
             self._refresh_jobs()
             self.statusBar().showMessage(f"Job '{updated.name}' saved.")
 
+    def _duplicate_job(self):
+        job_id = self._selected_job_id()
+        if not job_id:
+            QMessageBox.information(self, "No selection", "Select a job to duplicate.")
+            return
+        import copy, uuid
+        src = self.db.get_job(job_id)
+        new_job = copy.deepcopy(src)
+        new_job.id = str(uuid.uuid4())
+        new_job.name = f"Copy of {src.name}"
+        new_job.last_run = None
+        new_job.last_status = ""
+        self.db.save_job(new_job)
+        if new_job.enabled:
+            self.scheduler.schedule_job(new_job)
+        self._refresh_jobs()
+        self.statusBar().showMessage(f"Job '{new_job.name}' created.")
+
     def _delete_job(self):
         job_id = self._selected_job_id()
         if not job_id:
@@ -330,6 +349,7 @@ class MainWindow(QMainWindow):
         if job_id:
             job = self.db.get_job(job_id)
             menu.addAction("✎  Edit Job",        self._edit_job)
+            menu.addAction("⧉  Duplicate Job",   self._duplicate_job)
             menu.addAction("▶  Run Now",          self._run_now)
             menu.addSeparator()
             menu.addAction("⎘  Copy Row",         self._copy_selection)

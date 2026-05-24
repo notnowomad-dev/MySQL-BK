@@ -255,17 +255,18 @@ class BackupRunner:
     def _copy_to_alt_dest(
         self, since: float, progress: Optional[Callable]
     ) -> Tuple[bool, str]:
-        # Register stored credentials before touching the share.
         if getattr(self.job, "alt_dest_user", ""):
             _register_network_credentials(
                 self.job.alt_dest, self.job.alt_dest_user, self.job.alt_dest_pass
             )
-        # Resolve mapped drive letters to UNC paths so the copy works even when
-        # the drive isn't mounted in the current session (e.g. scheduled runs).
-        # Falls back to normpath for plain local/UNC paths.
-        alt = _mapped_drive_to_unc(self.job.alt_dest)
-        if alt == self.job.alt_dest:
-            alt = os.path.normpath(alt)
+        base = _mapped_drive_to_unc(self.job.alt_dest)
+        if base == self.job.alt_dest:
+            base = os.path.normpath(base)
+
+        # Dated subfolder: \YYYY\MM\Ddd  e.g. \2026\05\Sun
+        now = datetime.now()
+        alt = os.path.join(base, now.strftime("%Y"), now.strftime("%m"), now.strftime("%a"))
+
         last_err = None
         for attempt in range(3):
             try:
@@ -292,6 +293,7 @@ class BackupRunner:
             return True, f"Alt dest: {len(copied)} file(s) copied to {alt}"
         except Exception as e:
             return False, f"Alt dest copy failed: {e}"
+
 
     def _compress(self, sql_paths: List[str], arc_path: str):
         """Write a .zip archive. Uses pyzipper for AES-256 when a password is set."""
