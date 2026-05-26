@@ -70,6 +70,9 @@ class BackupRunner:
                 else:
                     ok, msg = self._run_single(ts, progress)
 
+            if ok:
+                self._cleanup_old_files(progress)
+
             if ok and self.job.alt_dest_enabled and self.job.alt_dest:
                 alt_ok, alt_msg = self._copy_to_alt_dest(since, progress)
                 msg = f"{msg} | {alt_msg}"
@@ -251,6 +254,23 @@ class BackupRunner:
             return True, f"Compressed: {arc_path}"
         except Exception as e:
             return False, f"Compression error: {e}"
+
+    def _cleanup_old_files(self, progress: Optional[Callable]) -> None:
+        days = getattr(self.job, "retention_days", 0)
+        if days <= 0:
+            return
+        cutoff = time.time() - days * 86400
+        deleted = []
+        try:
+            for fname in os.listdir(self.job.output_dir):
+                fpath = os.path.join(self.job.output_dir, fname)
+                if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff:
+                    os.remove(fpath)
+                    deleted.append(fname)
+        except Exception:
+            pass
+        if deleted and progress:
+            progress(f"Retention: deleted {len(deleted)} file(s) older than {days} day(s)")
 
     def _copy_to_alt_dest(
         self, since: float, progress: Optional[Callable]

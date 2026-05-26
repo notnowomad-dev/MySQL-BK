@@ -37,6 +37,7 @@ class BackupJob:
     alt_dest: str = ""
     alt_dest_user: str = ""
     alt_dest_pass: str = ""
+    retention_days: int = 0
 
     def to_dict(self) -> dict:
         d = asdict(self)

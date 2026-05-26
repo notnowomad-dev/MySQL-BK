@@ -345,6 +345,14 @@ class JobDialog(QDialog):
         self._enabled.setChecked(True)
         form.addRow(self._enabled)
 
+        self._retention_days = QSpinBox()
+        self._retention_days.setRange(0, 9999)
+        self._retention_days.setValue(0)
+        self._retention_days.setSpecialValueText("Keep all  (disabled)")
+        self._retention_days.setSuffix(" days")
+        self._retention_days.setFixedWidth(160)
+        form.addRow("Delete backups older than:", self._retention_days)
+
         alt_box = QGroupBox("Alternate Destination")
         alt_lay = QVBoxLayout(alt_box)
         self._alt_dest_enabled = QCheckBox(
@@ -567,6 +575,7 @@ class JobDialog(QDialog):
             self._mssql_fmt_bak_rb.setChecked(True)
         else:
             self._mssql_fmt_sql_rb.setChecked(True)
+        self._retention_days.setValue(getattr(job, "retention_days", 0))
         self._alt_dest_enabled.setChecked(job.alt_dest_enabled)
         self._alt_dest.setText(job.alt_dest)
         self._alt_dest_user.setText(getattr(job, "alt_dest_user", ""))
@@ -612,6 +621,7 @@ class JobDialog(QDialog):
         job.mssql_driver = self._mssql_driver.currentText()
         job.windows_auth = self._win_auth.isChecked()
         job.mssql_backup_format = "bak" if self._mssql_fmt_bak_rb.isChecked() else "sql"
+        job.retention_days = self._retention_days.value()
         job.alt_dest_enabled = self._alt_dest_enabled.isChecked()
         job.alt_dest = self._alt_dest.text().strip()
         job.alt_dest_user = self._alt_dest_user.text().strip()
